@@ -208,7 +208,6 @@
             color: var(--primary-color);
             text-decoration: none;
             transition: color 0.3s ease;
-            cursor: pointer;
         }
         .project-title a:hover {
             color: var(--accent-color);
@@ -387,8 +386,8 @@
         <div class="card">
             <h2>Games & Creative Tools</h2>
             <div class="project-item">
-                <div class="project-title"><a onclick="showSection('monkey-runner')">🐵 Monkey Runner 3D</a></div>
-                <p>An amazing 3D endless runner game built with Three.js. Play as a monkey escaping the subway warden, collect bananas, use power-ups, and compete in multiplayer mode!</p>
+                <div class="project-title"><a href="monkey.html" target="_blank">🐵 Monkey Runner 3D</a></div>
+                <p>An amazing 3D endless runner game built with Three.js. Play as a monkey escaping the subway warden, collect bananas, use power-ups, and compete in multiplayer mode! (Opens in new tab)</p>
             </div>
 
             
@@ -419,22 +418,13 @@
         </div>
     </div>
 
-    <!-- MONKEY RUNNER SECTION -->
-    <div id="sec-monkey-runner" class="content-section">
-        <div class="card" style="padding: 0; overflow: hidden; height: 75vh; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-            <iframe src="monkey.html" style="width: 100%; height: 100%; border: none;"></iframe>
-        </div>
-        <div style="text-align: center; margin-top: 15px;">
-            <button onclick="showSection('games')" class="submit-btn" style="background-color: var(--primary-color);">← Back to Games</button>
-        </div>
-    </div>
-
     <!-- CONTACT SECTION -->
-    <div id="sec-contact" class="content-section">
+    
+    <!-- MONKEY RUNNER SECTION REMOVED (Opens in new tab) -->
+<div id="sec-contact" class="content-section">
         <div class="card">
             <h2>Contact Me</h2>
             <form action="https://formspree.io/f/xqejlnge" method="POST">
-                <!-- Name Field Added Here -->
                 <div class="form-group">
                     <label for="name">Your Name:</label>
                     <input type="text" id="name" name="name" placeholder="Enter your name" required>
@@ -482,15 +472,12 @@
         });
 
         // Highlight the correct nav button
-        if(sectionId !== 'maths' && sectionId !== 'art' && sectionId !== 'monkey-runner') {
+        if(sectionId !== 'maths' && sectionId !== 'art') {
              const activeBtn = document.getElementById('btn-' + sectionId);
              if (activeBtn) activeBtn.classList.add('active');
-        } else if (sectionId === 'maths' || sectionId === 'art') {
+        } else {
              const classBtn = document.getElementById('btn-classes');
              if(classBtn) classBtn.classList.add('active');
-        } else if (sectionId === 'monkey-runner') {
-             const gamesBtn = document.getElementById('btn-games');
-             if (gamesBtn) gamesBtn.classList.add('active');
         }
         
         // Scroll to the top of the container
@@ -502,5 +489,5 @@
 </script>
 
 </body>
-  </html>
-  
+        </html>
+                    
