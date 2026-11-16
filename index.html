@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sanjay - Vortix Spark Lab</title>
+    <style>
+        :root {
+            --primary-color: #003366;
+            --accent-color: #00a8e8;
+            --bg-color: #f4f7f6;
+            --text-color: #333333;
+            --white: #ffffff;
+            --tab-green: #28a745;
+            --tab-green-hover: #218838;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        header {
+            background-color: var(--primary-color);
+            color: var(--white);
+            padding: 1rem 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: auto;
+            padding: 0 20px;
+        }
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--white);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+        }
+        .logo span {
+            color: var(--accent-color);
+        }
+        .nav-links {
+            list-style: none;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .nav-links li button {
+            color: var(--white);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1.1rem;
+            background-color: var(--tab-green);
+            padding: 8px 18px;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .nav-links li button:hover, .nav-links li button.active {
+            background-color: var(--tab-green-hover);
+            transform: translateY(-2px);
+        }
+        .dropdown {
+            position: relative;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--white);
+            min-width: 150px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            z-index: 1;
+            border-radius: 5px;
+            overflow: hidden;
+            top: 100%;
+            left: 0;
+            margin-top: 5px;
+        }
+        .dropdown-content button {
+            color: var(--text-color) !important;
+            padding: 12px 16px;
+            display: block;
+            width: 100%;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            background-color: transparent;
+            border-radius: 0;
+        }
+        .dropdown-content button:hover {
+            background-color: var(--tab-green-hover);
+            color: var(--white) !important;
+            transform: none;
+        }
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+        
+        .hero {
+            background: linear-gradient(135deg, #003366 0%, #005b9f 100%);
+            color: var(--white);
+            text-align: center;
+            padding: 60px 20px;
+            border-bottom: 5px solid var(--accent-color);
+        }
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        .hero p {
+            font-size: 1.2rem;
+            max-width: 700px;
+            margin: auto;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+            min-height: 50vh;
+        }
+        
+        /* Section Hiding Logic */
+        .content-section {
+            display: none;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+        .content-section.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 35px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            border-left: 6px solid var(--accent-color);
+            margin-bottom: 30px;
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .card h2 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 2rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card ul {
+            list-style-type: none;
+        }
+        .card ul li {
+            position: relative;
+            padding-left: 25px;
+            margin-bottom: 12px;
+            font-size: 1.15rem;
+        }
+        .card ul li::before {
+            content: '✓';
+            color: var(--accent-color);
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+        .project-item {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px dashed #ddd;
+        }
+        .project-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .project-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .project-title a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.3s ease;
+            cursor: pointer;
+        }
+        .project-title a:hover {
+            color: var(--accent-color);
+            text-decoration: underline;
+        }
+        .project-img {
+            max-width: 100%;
+            width: 300px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 2px solid var(--accent-color);
+            transition: transform 0.3s;
+            display: block;
+        }
+        .project-img:hover {
+            transform: scale(1.02);
+        }
+        
+        /* Contact Form Layout */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--primary-color);
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+        .submit-btn {
+            background-color: var(--tab-green);
+            color: var(--white);
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        .submit-btn:hover {
+            background-color: var(--tab-green-hover);
+            transform: translateY(-2px);
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            margin-top: 40px;
+        }
+        .footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <nav>
+        <div class="logo" onclick="showSection('home')">Vortix <span>Spark Lab</span></div>
+        <ul class="nav-links">
+            <li><button onclick="showSection('home')" id="btn-home" class="active">Home</button></li>
+            <li class="dropdown">
+                <button id="btn-classes">Classes ▾</button>
+                <div class="dropdown-content">
+                    <button onclick="showSection('maths')">Maths</button>
+                    <button onclick="showSection('art')">Art</button>
+                </div>
+            </li>
+            <li><button onclick="showSection('activities')" id="btn-activities">Activities</button></li>
+            <li><button onclick="showSection('games')" id="btn-games">Games & Tools</button></li>
+            <li><button onclick="showSection('contact')" id="btn-contact">Contact</button></li>
+        </ul>
+    </nav>
+</header>
+
+<section class="hero">
+    <h1>Hi, I am Sanjay</h1>
+    <p>Welcome to my digital space. Exploring the world of computers, design, and software engineering.</p>
+</section>
+
+<div class="container">
+    
+    <!-- HOME SECTION -->
+    <div id="sec-home" class="content-section active">
+        <div class="card">
+            <h2>About Me</h2>
+            <ul>
+                <li>I am Sanjay Singh from Etawah, UP India.</li>
+                <li>My Class 8 session in Seven Hills started on April 6, 2026.</li>
+                <li>I am a professional in Photoshop and computer skills.</li>
+            </ul>
+        </div>
+        
+        <div class="card">
+            <h2>Goals</h2>
+            <ul>
+                <li>Becoming a world-famous software engineer.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>My Achievements</h2>
+            <div class="project-item">
+                <div class="project-title">🏆 School Awards & Recognition</div>
+                <p>Secured 1st and 2nd positions at M.S.K. International Sr. Sec. School (Session 2023-24). Click the image to view.</p>
+                <a href="1000090456.jpg" target="_blank" title="Click to view full size">
+                    <img src="1000090456.jpg" alt="School Trophies" class="project-img" style="width: 100%; max-width: 450px;">
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- MATHS SECTION -->
+    <div id="sec-maths" class="content-section">
+        <div class="card">
+            <h2>Mathematics (Class 8)</h2>
+            <p>Currently studying from the <strong>Ganita Prakash</strong> textbook. I particularly enjoy solving complex square roots using the <strong>Gap Method</strong> and <strong>Long Division</strong> techniques.</p>
+        </div>
+    </div>
+
+    <!-- ART SECTION -->
+    <div id="sec-art" class="content-section">
+        <div class="card">
+            <h2>Art & Design</h2>
+            <p>I use tools like Photoshop, Photopea, and Vectorpea to create digital art and professional designs.</p>
+        </div>
+    </div>
+
+    <!-- ACTIVITIES SECTION -->
+    <div id="sec-activities" class="content-section">
+        <div class="card">
+            <h2>My Activities & Innovations</h2>
+            
+            <div class="project-item">
+                <div class="project-title">🔬 Homemade Waste Material Microscope</div>
+                <p>Built a fully functional compound microscope using everyday waste materials, white plastic tubes, and convex lenses. Successfully adjusted focal lengths to magnify tiny structures!</p>
+                <a href="1000090457.jpg" target="_blank" title="Click to view full size">
+                    <img src="1000090457.jpg" alt="Homemade Microscope Part" class="project-img">
+                </a>
+            </div>
+
+            <div class="project-item">
+                <div class="project-title">🤖 Robotics & Electronics Exploration</div>
+                <p>Designing circuits, understanding hardware components, and working on micro-innovation projects.</p>
+            </div>
+
+            <div class="project-item">
+                <div class="project-title">⚡ Electricity & Battery Tech Projects</div>
+                <p>Experimenting with power solutions, including building custom 3S lithium-ion battery packs (11.1V), exploring series wiring, and learning DIY electronics safety.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAMES & TOOLS SECTION -->
+    <div id="sec-games" class="content-section">
+        <div class="card">
+            <h2>Games & Creative Tools</h2>
+            <div class="project-item">
+                <div class="project-title"><a onclick="showSection('monkey-runner')">🐵 Monkey Runner 3D</a></div>
+                <p>An amazing 3D endless runner game built with Three.js. Play as a monkey escaping the subway warden, collect bananas, use power-ups, and compete in multiplayer mode!</p>
+            </div>
+
+            
+            <div class="project-item">
+                <div class="project-title">🎮 Minecraft & BGMI</div>
+                <p>I enjoy playing and finding new ways to optimize performance for Battlegrounds Mobile India and Minecraft.</p>
+            </div>
+
+            <div class="project-item">
+                <div class="project-title"><a href="https://poki.com" target="_blank">🎮 Poki</a></div>
+                <p>A massive online playground! You can play thousands of free web games directly in your browser without any downloads.</p>
+            </div>
+
+            <div class="project-item">
+                <div class="project-title"><a href="https://playhop.com" target="_blank">🕹️ Playhop</a></div>
+                <p>An amazing collection of browser-based games. From action to puzzles, it's a great place to discover and play games instantly.</p>
+            </div>
+
+            <div class="project-item">
+                <div class="project-title"><a href="https://www.photopea.com" target="_blank">🎨 Photopea</a></div>
+                <p>A powerful, free web-based graphics editor. Perfect for my Photoshop skills, allowing PSD editing and professional designing right in the browser.</p>
+            </div>
+
+            <div class="project-item">
+                <div class="project-title"><a href="https://www.vectorpea.com" target="_blank">✒️ Vectorpea</a></div>
+                <p>An online vector graphics editor similar to Illustrator. Great for creating scalable vector designs, logos, and digital artwork.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MONKEY RUNNER SECTION -->
+    <div id="sec-monkey-runner" class="content-section">
+        <div class="card" style="padding: 0; overflow: hidden; height: 75vh; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+            <iframe src="monkey.html" style="width: 100%; height: 100%; border: none;"></iframe>
+        </div>
+        <div style="text-align: center; margin-top: 15px;">
+            <button onclick="showSection('games')" class="submit-btn" style="background-color: var(--primary-color);">← Back to Games</button>
+        </div>
+    </div>
+
+    <!-- CONTACT SECTION -->
+    <div id="sec-contact" class="content-section">
+        <div class="card">
+            <h2>Contact Me</h2>
+            <form action="https://formspree.io/f/xqejlnge" method="POST">
+                <!-- Name Field Added Here -->
+                <div class="form-group">
+                    <label for="name">Your Name:</label>
+                    <input type="text" id="name" name="name" placeholder="Enter your name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Your Email Address:</label>
+                    <input type="email" id="email" name="email" placeholder="example@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="message">Your Message:</label>
+                    <textarea id="message" name="message" rows="5" placeholder="Write your message here..." required></textarea>
+                </div>
+                <button type="submit" class="submit-btn">Send Message</button>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<footer class="footer">
+    <p>Email me at: <a href="mailto:sanjay201220@outlook.com">sanjay201220@outlook.com</a></p>
+    <br>
+    <p>&copy; 2026 Sanjay Singh - Vortix Spark Lab. All rights reserved.</p>
+</footer>
+
+<script>
+    // JavaScript to handle section switching
+    function showSection(sectionId) {
+        // Hide all sections
+        const sections = document.querySelectorAll('.content-section');
+        sections.forEach(sec => {
+            sec.classList.remove('active');
+        });
+
+        // Show the selected section
+        const targetSection = document.getElementById('sec-' + sectionId);
+        if (targetSection) {
+            targetSection.classList.add('active');
+        }
+
+        // Update active state on nav buttons (except dropdown items)
+        const navButtons = document.querySelectorAll('.nav-links > li > button');
+        navButtons.forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        // Highlight the correct nav button
+        if(sectionId !== 'maths' && sectionId !== 'art' && sectionId !== 'monkey-runner') {
+             const activeBtn = document.getElementById('btn-' + sectionId);
+             if (activeBtn) activeBtn.classList.add('active');
+        } else if (sectionId === 'maths' || sectionId === 'art') {
+             const classBtn = document.getElementById('btn-classes');
+             if(classBtn) classBtn.classList.add('active');
+        } else if (sectionId === 'monkey-runner') {
+             const gamesBtn = document.getElementById('btn-games');
+             if (gamesBtn) gamesBtn.classList.add('active');
+        }
+        
+        // Scroll to the top of the container
+        window.scrollTo({
+            top: document.querySelector('.hero').offsetHeight,
+            behavior: 'smooth'
+        });
+    }
+</script>
+
+</body>
+  </html>
+  
