@@ -1,0 +1,2711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Monkey Runner 3D - Subway Surfers Ultimate Edition</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #0b1710;
+    }
+    #game-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .touch-btn {
+      touch-action: manipulation;
+      transition: transform 0.08s ease, filter 0.1s ease;
+    }
+    .touch-btn:active {
+      transform: scale(0.92);
+      filter: brightness(1.25);
+    }
+    @keyframes pulseScore {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); color: #fde047; }
+      100% { transform: scale(1); }
+    }
+    .score-pop {
+      animation: pulseScore 0.22s ease-out;
+    }
+    @keyframes slideInDown {
+      0% { transform: translateY(-100%); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+    .biome-toast {
+      animation: slideInDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(16, 185, 129, 0.4);
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body class="relative w-full h-full bg-slate-950 text-white">
+
+  <!-- 3D WebGL Canvas -->
+  <div id="canvas-container" class="absolute inset-0 w-full h-full overflow-hidden">
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <!-- Cinematic Vignette Overlay -->
+  <div class="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.7)] z-10"></div>
+
+  <!-- Biome Switch Toast Notification -->
+  <div id="biome-banner" class="hidden absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-none biome-toast">
+    <div id="biome-banner-box" class="px-6 py-2.5 rounded-full border border-white/30 backdrop-blur-md shadow-2xl flex items-center gap-3">
+      <span id="biome-banner-icon" class="text-2xl">🌴</span>
+      <span id="biome-banner-text" class="font-black text-sm tracking-widest uppercase">ENTERING JUNGLE TEMPLE</span>
+    </div>
+  </div>
+
+  <!-- In-Game HUD -->
+  <header class="absolute top-0 left-0 right-0 p-3 sm:p-4 pointer-events-none flex justify-between items-start z-20">
+    <div class="flex flex-col gap-2 max-w-[62%]">
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- Banana Counter -->
+        <div class="bg-black/65 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-yellow-500/40 flex items-center gap-2 shadow-2xl">
+          <span class="text-xl drop-shadow">🍌</span>
+          <span id="banana-count" class="font-extrabold text-yellow-400 text-lg tracking-wider">0</span>
+        </div>
+        <!-- Distance Counter -->
+        <div class="bg-black/65 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-emerald-500/40 flex items-center gap-2 shadow-2xl">
+          <span class="text-emerald-400 text-xs font-bold uppercase tracking-widest">RUN</span>
+          <span id="distance-count" class="font-extrabold text-white text-lg tracking-wider">0m</span>
+        </div>
+        <!-- Current Biome Tag (Click to cycle background anytime!) -->
+        <button id="biome-tag" type="button" class="pointer-events-auto bg-black/65 hover:bg-black/85 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/20 flex items-center gap-1.5 shadow-2xl text-xs font-bold uppercase tracking-wider text-emerald-300 cursor-pointer transition" title="Click to Switch World Background">
+          <span id="biome-tag-icon">🌴</span>
+          <span id="biome-tag-text">Jungle</span>
+        </button>
+      </div>
+
+      <!-- Active Power-Up Badges -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- Flying Car Power-Up Timer Badge (15s) -->
+        <div id="fly-timer-container" class="hidden bg-cyan-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-cyan-400/70 flex items-center gap-2 shadow-2xl animate-pulse">
+          <span class="text-xl">🛸</span>
+          <div>
+            <div class="text-[9px] text-cyan-300 font-bold uppercase tracking-widest leading-none">FLYING CAR</div>
+            <div id="fly-timer-text" class="font-black text-cyan-200 text-sm tracking-wider leading-tight">15.0s</div>
+          </div>
+        </div>
+        <!-- Hoverboard Shield Badge -->
+        <div id="hoverboard-container" class="hidden bg-purple-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-purple-400/70 flex items-center gap-2 shadow-2xl animate-pulse">
+          <span class="text-xl">🛹</span>
+          <div>
+            <div class="text-[9px] text-purple-300 font-bold uppercase tracking-widest leading-none">HOVERBOARD</div>
+            <div id="hoverboard-timer-text" class="font-black text-purple-200 text-sm tracking-wider leading-tight">12.0s</div>
+          </div>
+        </div>
+        <!-- Banana Magnet Badge -->
+        <div id="magnet-container" class="hidden bg-red-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-red-400/70 flex items-center gap-2 shadow-2xl animate-pulse">
+          <span class="text-xl">🧲</span>
+          <div>
+            <div class="text-[9px] text-red-300 font-bold uppercase tracking-widest leading-none">MAGNET</div>
+            <div id="magnet-timer-text" class="font-black text-red-200 text-sm tracking-wider leading-tight">10.0s</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Controls + Live Multiplayer Race Leaderboard -->
+    <div class="flex flex-col items-end gap-2">
+      <div class="flex items-center gap-1.5 pointer-events-auto flex-wrap justify-end">
+        <!-- Live In-Game Single/Multiplayer Switch Button -->
+        <button id="hud-mode-btn" type="button" class="bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-300 px-3 py-2 rounded-2xl border border-emerald-400/40 shadow-xl text-xs font-bold tracking-wide transition h-10 flex items-center gap-1 cursor-pointer" title="Switch Single Player / Multiplayer Mode">
+          <span id="hud-mode-icon">🤖</span>
+          <span id="hud-mode-label" class="hidden sm:inline">Multiplayer</span>
+        </button>
+        <button id="hud-leaderboard-btn" class="bg-black/65 backdrop-blur-md hover:bg-black/85 text-yellow-300 px-3 py-2 rounded-2xl border border-yellow-500/30 shadow-xl text-xs font-bold tracking-wide transition h-10 flex items-center gap-1 cursor-pointer" title="View Leaderboard & History">
+          <span>🏆</span> <span class="hidden sm:inline">Ranks</span>
+        </button>
+        <button id="mute-btn" class="bg-black/65 backdrop-blur-md hover:bg-black/85 text-white p-2 rounded-2xl border border-white/20 shadow-xl text-base transition flex items-center justify-center w-10 h-10 cursor-pointer" title="Toggle Sound">
+          🔊
+        </button>
+        <button id="pause-btn" class="bg-black/65 backdrop-blur-md hover:bg-black/85 text-white px-3.5 py-2 rounded-2xl border border-white/20 shadow-xl text-xs font-semibold tracking-wide transition h-10 cursor-pointer">
+          Pause
+        </button>
+      </div>
+
+      <!-- Live Race Standings Box (Visible in Multiplayer Mode) -->
+      <div id="live-race-board" class="bg-black/70 backdrop-blur-md rounded-2xl border border-white/15 p-2.5 w-48 sm:w-56 shadow-2xl">
+        <div class="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-1.5 flex items-center justify-between border-b border-white/10 pb-1">
+          <span>🏁 LIVE 6-RACER STANDINGS</span>
+          <span id="player-rank-badge" class="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded">1st</span>
+        </div>
+        <div id="live-standings-list" class="space-y-1 text-[11px]">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Start / Customization Overlay -->
+  <div id="start-overlay" class="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-5 z-30 transition-opacity duration-300 overflow-y-auto">
+    <div class="max-w-lg w-full bg-gradient-to-b from-emerald-950/95 via-slate-900/95 to-slate-950/95 border border-emerald-500/40 rounded-3xl p-5 sm:p-6 text-center shadow-2xl my-auto pointer-events-auto">
+      <div class="flex items-center justify-center gap-2 mb-1">
+        <span class="text-4xl animate-bounce">🐵</span>
+        <h1 class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-emerald-400 to-cyan-300 tracking-wider uppercase">
+          Subway Monkey Surfers
+        </h1>
+      </div>
+      <p class="text-emerald-200/80 text-xs mb-3 font-medium">Customize Name • 8 Skins • 6 Worlds • Single & Multiplayer Modes</p>
+
+      <!-- 1. Customize Player Name -->
+      <div class="bg-black/45 rounded-2xl p-3 mb-2.5 border border-white/10 text-left">
+        <div class="flex justify-between items-center mb-1">
+          <label for="player-name-input" class="block text-[10px] font-bold uppercase tracking-wider text-emerald-300">1. Customize Your Racer Name</label>
+          <span id="name-saved-badge" class="hidden text-[10px] text-emerald-400 font-bold">✓ Saved!</span>
+        </div>
+        <div class="flex gap-1.5">
+          <input id="player-name-input" type="text" maxlength="14" value="MonkeyKing" placeholder="Enter your name..." class="flex-1 bg-slate-900/90 border border-white/20 rounded-xl px-3 py-1.5 text-sm text-white font-bold focus:outline-none focus:border-emerald-400">
+          <button id="save-name-btn" type="button" class="bg-emerald-500/25 hover:bg-emerald-500/40 text-xs px-3 py-1.5 rounded-xl font-bold text-emerald-200 border border-emerald-400/40 cursor-pointer">
+            💾 Save
+          </button>
+          <button id="random-name-btn" type="button" class="bg-white/10 hover:bg-white/20 text-xs px-2.5 py-1.5 rounded-xl font-bold text-yellow-300 border border-white/15 cursor-pointer" title="Randomize Name">
+            🎲 Random
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Choose Character Skin / Player (8 Options) -->
+      <div class="bg-black/45 rounded-2xl p-3 mb-2.5 border border-white/10 text-left">
+        <div class="flex justify-between items-center mb-1.5">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-yellow-300">2. Select Player Skin (8 Characters)</span>
+          <span id="selected-skin-label" class="text-[11px] font-extrabold text-white bg-yellow-500/20 px-2 py-0.5 rounded-full border border-yellow-400/40">🐵 Classic Kong</span>
+        </div>
+        <div id="skin-selector-grid" class="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </div>
+
+      <!-- 3. Choose Starting World Background (6 Biomes, auto-cycles every 50s) -->
+      <div class="bg-black/45 rounded-2xl p-3 mb-3 border border-white/10 text-left">
+        <div class="flex justify-between items-center mb-1.5">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-cyan-300">3. Select World Background (Changes Every 50s)</span>
+          <span id="selected-world-label" class="text-[11px] font-extrabold text-white bg-cyan-500/20 px-2 py-0.5 rounded-full border border-cyan-400/40">🌴 Jungle Temple</span>
+        </div>
+        <div id="world-selector-grid" class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </div>
+
+      <!-- Mode Toggle Pills -->
+      <div class="grid grid-cols-2 gap-2 mb-2.5">
+        <button id="mode-multi-btn" type="button" class="py-1.5 px-3 rounded-xl font-bold text-xs border border-emerald-400 bg-emerald-500/25 text-white flex items-center justify-center gap-1.5 shadow transition cursor-pointer">
+          <span>🤖</span> Multiplayer Race
+        </button>
+        <button id="mode-solo-btn" type="button" class="py-1.5 px-3 rounded-xl font-bold text-xs border border-white/15 bg-white/5 text-gray-300 hover:bg-white/10 flex items-center justify-center gap-1.5 transition cursor-pointer">
+          <span>🏃</span> Solo Endless
+        </button>
+      </div>
+
+      <!-- Direct Launch Buttons for Single Player & Multiplayer Mode -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
+        <button id="play-single-btn" type="button" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-black font-black text-sm py-3.5 px-4 rounded-2xl shadow-xl transform active:scale-95 transition cursor-pointer flex items-center justify-center gap-2 tracking-wide">
+          <span>🏃</span> PLAY SINGLE PLAYER
+        </button>
+        <button id="play-multi-btn" type="button" class="w-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-black font-black text-sm py-3.5 px-4 rounded-2xl shadow-xl transform active:scale-95 transition cursor-pointer flex items-center justify-center gap-2 tracking-wide">
+          <span>🤖</span> PLAY MULTIPLAYER MODE
+        </button>
+      </div>
+
+      <!-- Bottom Row: Leaderboard History & Quick Start -->
+      <div class="flex gap-2">
+        <button id="open-leaderboard-start-btn" type="button" class="flex-1 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-400/50 text-yellow-300 font-extrabold text-xs py-2.5 px-3 rounded-xl shadow transition cursor-pointer flex items-center justify-center gap-1.5">
+          <span>🏆</span> Top Ranks
+        </button>
+        <button id="start-btn" type="button" class="flex-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-extrabold text-xs py-2.5 px-3 rounded-xl shadow transition cursor-pointer">
+          START RUNNING
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div id="gameover-overlay" class="hidden absolute inset-0 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-4 z-30 overflow-y-auto">
+    <div class="max-w-md w-full bg-gradient-to-b from-stone-900/95 to-slate-950/95 border border-red-500/50 rounded-3xl p-6 text-center shadow-2xl my-auto pointer-events-auto">
+      <div id="gameover-icon" class="text-5xl mb-1">👮‍♂️</div>
+      <h2 id="gameover-title" class="text-2xl sm:text-3xl font-black text-red-400 uppercase tracking-wider mb-0.5">Caught!</h2>
+      <p id="gameover-desc" class="text-gray-400 text-xs mb-4">The subway warden nabbed the monkey.</p>
+
+      <div class="grid grid-cols-3 gap-2.5 mb-4">
+        <div class="bg-white/5 rounded-2xl p-3 border border-white/10">
+          <div class="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">Distance</div>
+          <div id="final-distance" class="text-xl font-black text-emerald-400">0m</div>
+        </div>
+        <div class="bg-white/5 rounded-2xl p-3 border border-white/10">
+          <div class="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">Bananas</div>
+          <div id="final-bananas" class="text-xl font-black text-yellow-400">0</div>
+        </div>
+        <div class="bg-white/5 rounded-2xl p-3 border border-white/10">
+          <div class="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">Race Place</div>
+          <div id="final-rank" class="text-xl font-black text-cyan-400">1st</div>
+        </div>
+        <div class="col-span-3 bg-white/5 rounded-2xl p-2.5 border border-white/10 flex justify-between items-center px-4">
+          <span class="text-xs font-medium text-gray-400">Personal Best Distance:</span>
+          <span id="best-distance" class="text-base font-black text-white">0m</span>
+        </div>
+      </div>
+
+      <!-- Final Race Standings Table in Game Over -->
+      <div class="bg-black/50 rounded-2xl p-3 border border-white/10 mb-4 text-left max-h-40 overflow-y-auto">
+        <div class="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-2 flex justify-between">
+          <span>🏆 Match Standings</span>
+          <span>Score / Dist</span>
+        </div>
+        <div id="gameover-standings-list" class="space-y-1.5 text-xs">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <div class="flex gap-2 mb-2">
+        <button id="gameover-single-btn" type="button" class="flex-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 font-bold text-xs py-2.5 px-3 rounded-xl cursor-pointer">
+          🏃 Single Player
+        </button>
+        <button id="gameover-multi-btn" type="button" class="flex-1 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-300 font-bold text-xs py-2.5 px-3 rounded-xl cursor-pointer">
+          🤖 Multiplayer Race
+        </button>
+      </div>
+
+      <div class="flex gap-2.5">
+        <button id="open-leaderboard-over-btn" type="button" class="bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-400/50 text-yellow-300 font-extrabold text-sm py-3.5 px-4 rounded-2xl shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5">
+          <span>🏆</span> Hall of Fame
+        </button>
+        <button id="restart-btn" type="button" class="flex-1 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-black font-black text-base py-3.5 px-5 rounded-2xl shadow-xl transform active:scale-95 transition cursor-pointer tracking-wider">
+          RUN AGAIN ↺
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hall of Fame & Saved Match History Leaderboard Modal -->
+  <div id="leaderboard-modal" class="hidden absolute inset-0 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-4 z-40">
+    <div class="max-w-md w-full bg-slate-900 border border-yellow-500/40 rounded-3xl p-6 shadow-2xl pointer-events-auto">
+      <div class="flex items-center justify-between mb-3 border-b border-white/10 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-3xl">🏆</span>
+          <div>
+            <h3 class="text-xl font-black text-yellow-400 uppercase tracking-wider leading-none">Leaderboard & History</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Saved Top Ranks & Full Match Log</p>
+          </div>
+        </div>
+        <button id="close-leaderboard-btn" type="button" class="bg-white/10 hover:bg-white/20 text-white w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm cursor-pointer">
+          ✕
+        </button>
+      </div>
+
+      <!-- Tabs for Top Ranks vs Saved History -->
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <button id="tab-top-ranks-btn" type="button" class="py-2 px-3 rounded-xl font-bold text-xs bg-yellow-500/25 border border-yellow-400 text-yellow-300 cursor-pointer">
+          🥇 All-Time Top Ranks
+        </button>
+        <button id="tab-history-btn" type="button" class="py-2 px-3 rounded-xl font-bold text-xs bg-white/5 border border-white/15 text-gray-300 hover:bg-white/10 cursor-pointer">
+          📜 Saved Match History
+        </button>
+      </div>
+
+      <!-- Top Ranks List -->
+      <div id="hall-of-fame-list" class="space-y-2 max-h-64 overflow-y-auto pr-1 mb-4">
+        <!-- Populated by JS -->
+      </div>
+
+      <!-- Saved Match History List -->
+      <div id="match-history-list" class="hidden space-y-2 max-h-64 overflow-y-auto pr-1 mb-4">
+        <!-- Populated by JS -->
+      </div>
+
+      <div class="flex gap-2">
+        <button id="clear-history-btn" type="button" class="bg-red-500/20 hover:bg-red-500/30 border border-red-400/40 text-red-300 font-bold py-3 px-4 rounded-2xl text-xs uppercase tracking-wider cursor-pointer">
+          Clear History
+        </button>
+        <button id="close-leaderboard-bottom-btn" type="button" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-black py-3 rounded-2xl text-sm uppercase tracking-wider cursor-pointer">
+          Back to Game
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- On-Screen Touch Controls -->
+  <div class="absolute bottom-5 left-0 right-0 px-6 flex justify-between items-end pointer-events-none z-20">
+    <div class="flex gap-3 pointer-events-auto">
+      <button id="btn-left" class="touch-btn w-16 h-16 rounded-2xl bg-black/60 backdrop-blur-md border border-white/25 text-white flex items-center justify-center text-2xl shadow-2xl active:bg-emerald-600/70" aria-label="Move Left">
+        ◀
+      </button>
+      <button id="btn-right" class="touch-btn w-16 h-16 rounded-2xl bg-black/60 backdrop-blur-md border border-white/25 text-white flex items-center justify-center text-2xl shadow-2xl active:bg-emerald-600/70" aria-label="Move Right">
+        ▶
+      </button>
+    </div>
+
+    <div class="flex gap-3 pointer-events-auto">
+      <button id="btn-slide" class="touch-btn w-16 h-16 rounded-2xl bg-black/60 backdrop-blur-md border border-white/25 text-amber-400 flex flex-col items-center justify-center shadow-2xl active:bg-amber-600/70" aria-label="Slide Down">
+        <span class="text-xl leading-none">▼</span>
+        <span class="text-[10px] font-black uppercase tracking-wider mt-1">Slide</span>
+      </button>
+      <button id="btn-jump" class="touch-btn w-16 h-16 rounded-2xl bg-black/60 backdrop-blur-md border border-white/25 text-emerald-400 flex flex-col items-center justify-center shadow-2xl active:bg-emerald-600/70" aria-label="Jump Up">
+        <span class="text-xl leading-none">▲</span>
+        <span class="text-[10px] font-black uppercase tracking-wider mt-1">Jump</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Three.js Subway Surfers Ultimate Implementation -->
+  <script>
+    // --- Rich Web Audio Synthesis ---
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.bikeOsc = null;
+        this.bikeGain = null;
+        this.bikeFilter = null;
+        this.jetOsc = null;
+        this.jetGain = null;
+        this.jetFilter = null;
+        this.bgMusicTimer = null;
+        this.beatIndex = 0;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            this.ctx = new AudioCtx();
+            this.setupSynths();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      setupSynths() {
+        try {
+          this.bikeOsc = this.ctx.createOscillator();
+          this.bikeGain = this.ctx.createGain();
+          this.bikeFilter = this.ctx.createBiquadFilter();
+          this.bikeOsc.type = 'sawtooth';
+          this.bikeOsc.frequency.setValueAtTime(65, this.ctx.currentTime);
+          this.bikeFilter.type = 'lowpass';
+          this.bikeFilter.frequency.setValueAtTime(280, this.ctx.currentTime);
+          this.bikeGain.gain.setValueAtTime(0, this.ctx.currentTime);
+          this.bikeOsc.connect(this.bikeFilter);
+          this.bikeFilter.connect(this.bikeGain);
+          this.bikeGain.connect(this.ctx.destination);
+          this.bikeOsc.start();
+
+          this.jetOsc = this.ctx.createOscillator();
+          this.jetGain = this.ctx.createGain();
+          this.jetFilter = this.ctx.createBiquadFilter();
+          this.jetOsc.type = 'sawtooth';
+          this.jetOsc.frequency.setValueAtTime(450, this.ctx.currentTime);
+          this.jetFilter.type = 'bandpass';
+          this.jetFilter.frequency.setValueAtTime(850, this.ctx.currentTime);
+          this.jetFilter.Q.setValueAtTime(2.2, this.ctx.currentTime);
+          this.jetGain.gain.setValueAtTime(0, this.ctx.currentTime);
+          this.jetOsc.connect(this.jetFilter);
+          this.jetFilter.connect(this.jetGain);
+          this.jetGain.connect(this.ctx.destination);
+          this.jetOsc.start();
+        } catch(e) {}
+      }
+
+      startMusic() {
+        if (this.bgMusicTimer || !this.ctx) return;
+        const playBeat = () => {
+          if (!this.muted && this.ctx && gameState.running && !gameState.paused && !gameState.isCaught) {
+            const now = this.ctx.currentTime;
+            this.beatIndex = (this.beatIndex + 1) % 16;
+
+            if (this.beatIndex % 4 === 0) {
+              const kick = this.ctx.createOscillator();
+              const kGain = this.ctx.createGain();
+              kick.type = 'sine';
+              kick.frequency.setValueAtTime(110, now);
+              kick.frequency.exponentialRampToValueAtTime(36, now + 0.12);
+              kGain.gain.setValueAtTime(0.2, now);
+              kGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+              kick.connect(kGain);
+              kGain.connect(this.ctx.destination);
+              kick.start(now);
+              kick.stop(now + 0.12);
+            }
+
+            const melody = [523.25, 0, 587.33, 659.25, 0, 783.99, 659.25, 0, 523.25, 0, 880.0, 783.99, 0, 659.25, 587.33, 0];
+            const noteFreq = melody[this.beatIndex];
+            if (noteFreq > 0) {
+              const mOsc = this.ctx.createOscillator();
+              const mGain = this.ctx.createGain();
+              mOsc.type = 'triangle';
+              mOsc.frequency.setValueAtTime(noteFreq, now);
+              mGain.gain.setValueAtTime(0.05, now);
+              mGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+              mOsc.connect(mGain);
+              mGain.connect(this.ctx.destination);
+              mOsc.start(now);
+              mOsc.stop(now + 0.1);
+            }
+          }
+          this.bgMusicTimer = setTimeout(playBeat, 135);
+        };
+        playBeat();
+      }
+
+      stopMusic() {
+        if (this.bgMusicTimer) {
+          clearTimeout(this.bgMusicTimer);
+          this.bgMusicTimer = null;
+        }
+      }
+
+      updateBikeEngine(distanceToBike) {
+        if (this.muted || !this.bikeGain || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          if (distanceToBike < 45 && !gameState.isFlying) {
+            const vol = Math.max(0, 1 - (distanceToBike / 45)) * 0.22;
+            const pitch = 70 + Math.max(0, 1 - (distanceToBike / 45)) * 65;
+            this.bikeGain.gain.setTargetAtTime(vol, now, 0.05);
+            this.bikeOsc.frequency.setTargetAtTime(pitch, now, 0.05);
+          } else {
+            this.bikeGain.gain.setTargetAtTime(0, now, 0.1);
+          }
+        } catch(e) {}
+      }
+
+      updateJetSound(isFlying) {
+        if (this.muted || !this.jetGain || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          if (isFlying) {
+            this.jetGain.gain.setTargetAtTime(0.2, now, 0.05);
+            this.jetOsc.frequency.setTargetAtTime(480 + Math.sin(now * 8) * 35, now, 0.05);
+          } else {
+            this.jetGain.gain.setTargetAtTime(0, now, 0.08);
+          }
+        } catch(e) {}
+      }
+
+      stopAllContinuous() {
+        if (this.ctx) {
+          if (this.bikeGain) this.bikeGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+          if (this.jetGain) this.jetGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+        }
+      }
+
+      playJump() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(180, now);
+          osc.frequency.exponentialRampToValueAtTime(480, now + 0.16);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.16);
+        } catch(e) {}
+      }
+
+      playSlide() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(280, now);
+          osc.frequency.exponentialRampToValueAtTime(90, now + 0.22);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        } catch(e) {}
+      }
+
+      playCollect() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const notes = [659.25, 880, 1046.5];
+          notes.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.04);
+            gain.gain.setValueAtTime(0.16, now + idx * 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.04 + 0.12);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + idx * 0.04);
+            osc.stop(now + idx * 0.04 + 0.12);
+          });
+        } catch(e) {}
+      }
+
+      playPowerup() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const chords = [440, 554.37, 659.25, 880, 1108.7];
+          chords.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+            gain.gain.setValueAtTime(0.22, now + idx * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.25);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + idx * 0.06);
+            osc.stop(now + idx * 0.06 + 0.25);
+          });
+        } catch(e) {}
+      }
+
+      playShieldBreak() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(600, now);
+          osc.frequency.exponentialRampToValueAtTime(120, now + 0.3);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } catch(e) {}
+      }
+
+      playCrash() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.exponentialRampToValueAtTime(25, now + 0.4);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        } catch(e) {}
+      }
+
+      playBikeCrash() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const screech = this.ctx.createOscillator();
+          const screechGain = this.ctx.createGain();
+          screech.type = 'sawtooth';
+          screech.frequency.setValueAtTime(950, now);
+          screech.frequency.exponentialRampToValueAtTime(320, now + 0.35);
+          screechGain.gain.setValueAtTime(0.35, now);
+          screechGain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+          screech.connect(screechGain);
+          screechGain.connect(this.ctx.destination);
+          screech.start(now);
+          screech.stop(now + 0.35);
+        } catch(e) {}
+      }
+
+      playWhistle() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1800, now);
+          osc.frequency.setValueAtTime(2200, now + 0.08);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.28);
+        } catch(e) {}
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    // --- 8 Playable Monkey Skins / Characters ---
+    const SKINS = [
+      { id: 'classic', name: 'Classic Kong',    icon: '🐵', fur: 0x58341a, belly: 0xa87449, vest: 0x10b981, accessory: 'headband' },
+      { id: 'cyber',   name: 'Cyber Ape',       icon: '🤖', fur: 0x1e293b, belly: 0x38bdf8, vest: 0x06b6d4, accessory: 'visor' },
+      { id: 'golden',  name: 'Golden King',     icon: '👑', fur: 0xd97706, belly: 0xfde047, vest: 0xf59e0b, accessory: 'crown' },
+      { id: 'ninja',   name: 'Shadow Ninja',    icon: '🥷', fur: 0x111827, belly: 0x374151, vest: 0xef4444, accessory: 'headband' },
+      { id: 'yeti',    name: 'Arctic Yeti',     icon: '❄️', fur: 0xe2e8f0, belly: 0x7dd3fc, vest: 0x0284c7, accessory: 'visor' },
+      { id: 'lava',    name: 'Lava Blazer',     icon: '🔥', fur: 0x7f1d1d, belly: 0xf97316, vest: 0xea580c, accessory: 'crown' },
+      { id: 'sakura',  name: 'Sakura Monk',     icon: '🌸', fur: 0xbe185d, belly: 0xfbcfe8, vest: 0xf472b6, accessory: 'headband' },
+      { id: 'electro', name: 'Electro Gorilla', icon: '⚡', fur: 0x3b0764, belly: 0xc084fc, vest: 0x9333ea, accessory: 'visor' }
+    ];
+
+    // --- 6 Dynamic World Backgrounds (With Distinct 3D Scenery Props!) ---
+    const BIOMES = [
+      {
+        name: 'Jungle Temple',
+        short: 'Jungle',
+        icon: '🌴',
+        bannerText: 'ENTERING JUNGLE TEMPLE',
+        fogColor: 0x192d20,
+        skyColors: ['#0c2420', '#173f2c', '#3d5930', '#c98a3c', '#192d20'],
+        sunColor: 0xfff3d4,
+        hemiSky: 0xbef2a2,
+        hemiGround: 0x1a2618,
+        groundColor: 0x162c1a,
+        propPrimary: 0x4a3220,
+        propSecondary: 0x2a592e,
+        borderStyle: 'border-emerald-500/50 bg-emerald-950/80'
+      },
+      {
+        name: 'Cyber City',
+        short: 'Cyber',
+        icon: '🌆',
+        bannerText: 'ENTERING CYBER SUBWAY CITY',
+        fogColor: 0x0a1024,
+        skyColors: ['#040714', '#0d1633', '#1e1b4b', '#ec4899', '#0a1024'],
+        sunColor: 0x88ccff,
+        hemiSky: 0xa855f7,
+        hemiGround: 0x0e172a,
+        groundColor: 0x111625,
+        propPrimary: 0x1e1b4b,
+        propSecondary: 0x00ffff,
+        borderStyle: 'border-purple-500/50 bg-purple-950/80'
+      },
+      {
+        name: 'Sunset Canyon',
+        short: 'Canyon',
+        icon: '🏜️',
+        bannerText: 'ENTERING SUNSET CANYON',
+        fogColor: 0x3d170e,
+        skyColors: ['#1f0a07', '#42160d', '#7c2d12', '#f97316', '#3d170e'],
+        sunColor: 0xff8833,
+        hemiSky: 0xfdba74,
+        hemiGround: 0x27100b,
+        groundColor: 0x3a1910,
+        propPrimary: 0x9a3412,
+        propSecondary: 0x15803d,
+        borderStyle: 'border-orange-500/50 bg-orange-950/80'
+      },
+      {
+        name: 'Arctic Glacier',
+        short: 'Glacier',
+        icon: '❄️',
+        bannerText: 'ENTERING ARCTIC GLACIER',
+        fogColor: 0x0c2130,
+        skyColors: ['#040c14', '#0b263b', '#164e63', '#38bdf8', '#0c2130'],
+        sunColor: 0xbae6fd,
+        hemiSky: 0x7dd3fc,
+        hemiGround: 0x091b26,
+        groundColor: 0x132a38,
+        propPrimary: 0x38bdf8,
+        propSecondary: 0xe0f2fe,
+        borderStyle: 'border-cyan-500/50 bg-cyan-950/80'
+      },
+      {
+        name: 'Volcano Core',
+        short: 'Volcano',
+        icon: '🌋',
+        bannerText: 'ENTERING VOLCANO MAGMA CORE',
+        fogColor: 0x2b0909,
+        skyColors: ['#140303', '#3b0707', '#7f1d1d', '#ef4444', '#2b0909'],
+        sunColor: 0xff5533,
+        hemiSky: 0xf87171,
+        hemiGround: 0x1f0707,
+        groundColor: 0x240b0b,
+        propPrimary: 0x1c1917,
+        propSecondary: 0xff4500,
+        borderStyle: 'border-red-500/50 bg-red-950/80'
+      },
+      {
+        name: 'Sakura Blossom',
+        short: 'Sakura',
+        icon: '🌸',
+        bannerText: 'ENTERING SAKURA VALLEY',
+        fogColor: 0x26122b,
+        skyColors: ['#14081c', '#2e103d', '#6b21a8', '#f472b6', '#26122b'],
+        sunColor: 0xfbcfe8,
+        hemiSky: 0xf9a8d4,
+        hemiGround: 0x1f0d24,
+        groundColor: 0x241129,
+        propPrimary: 0x4a2511,
+        propSecondary: 0xf472b6,
+        borderStyle: 'border-pink-500/50 bg-pink-950/80'
+      }
+    ];
+
+    const CONFIG = {
+      lanes: [-2.8, 0, 2.8],
+      runSpeedInitial: 26,
+      runSpeedMax: 50,
+      speedRampRate: 0.16,
+      jumpVelocity: 15.2,
+      gravity: -40,
+      slideDuration: 0.68,
+      chunkLength: 42,
+      chunkCount: 7,
+      flyDuration: 15.0,
+      hoverboardDuration: 12.0,
+      magnetDuration: 10.0,
+      flightAltitude: 6.2,
+      biomeIntervalSeconds: 50
+    };
+
+    let gameState = {
+      running: false,
+      paused: false,
+      isMultiplayer: true,
+      playerName: 'MonkeyKing',
+      selectedSkinIndex: 0,
+      startingBiomeIndex: 0,
+      elapsedTime: 0,
+      currentBiomeIndex: 0,
+      distance: 0,
+      bananas: 0,
+      bestDistance: 0,
+      currentLane: 1,
+      targetX: 0,
+      monkeyY: 0,
+      monkeyVelocityY: 0,
+      isGrounded: true,
+      isSliding: false,
+      slideTimer: 0,
+      runSpeed: CONFIG.runSpeedInitial,
+      cameraX: 0,
+      cameraShake: 0,
+      isCaught: false,
+      catchProgress: 0,
+      gameOverReason: 'obstacle',
+      isFlying: false,
+      flyTimeRemaining: 0,
+      hasHoverboard: false,
+      hoverboardTimeRemaining: 0,
+      hasMagnet: false,
+      magnetTimeRemaining: 0
+    };
+
+    // --- Persistent Leaderboard & Match History Storage ---
+    const DEFAULT_LEADERBOARD = [
+      { name: 'Zazu Turbo (AI)', distance: 1420, bananas: 94, skin: '🤖 Cyber Ape', mode: 'Multiplayer' },
+      { name: 'Bobo Pro (AI)',   distance: 1150, bananas: 78, skin: '👑 Golden King', mode: 'Multiplayer' },
+      { name: 'JungleFlash',     distance: 980,  bananas: 65, skin: '🐵 Classic Kong', mode: 'Single Player' },
+      { name: 'Koko AI (Bot)',   distance: 840,  bananas: 52, skin: '🔥 Lava Blazer', mode: 'Multiplayer' },
+      { name: 'SubwayKong',      distance: 620,  bananas: 41, skin: '🥷 Shadow Ninja', mode: 'Single Player' }
+    ];
+
+    const DEFAULT_HISTORY = [
+      { name: 'MonkeyKing', distance: 740, bananas: 49, skin: '🐵 Classic Kong', mode: 'Multiplayer', rank: '2nd', time: 'Earlier Today' },
+      { name: 'MonkeyKing', distance: 530, bananas: 34, skin: '👑 Golden King',  mode: 'Single Player', rank: 'Solo', time: 'Earlier Today' }
+    ];
+
+    let globalLeaderboard = [...DEFAULT_LEADERBOARD];
+    let matchHistoryLog = [...DEFAULT_HISTORY];
+
+    function loadSavedData() {
+      try {
+        const savedName = localStorage.getItem('monkey_runner_player_name');
+        if (savedName) {
+          gameState.playerName = savedName;
+          document.getElementById('player-name-input').value = savedName;
+        }
+        const savedBest = localStorage.getItem('monkey_runner_highscore');
+        if (savedBest) gameState.bestDistance = parseInt(savedBest, 10) || 0;
+        const savedBoard = localStorage.getItem('monkey_runner_leaderboard_v2');
+        if (savedBoard) {
+          const parsed = JSON.parse(savedBoard);
+          if (Array.isArray(parsed) && parsed.length > 0) globalLeaderboard = parsed;
+        }
+        const savedHistory = localStorage.getItem('monkey_runner_history_v2');
+        if (savedHistory) {
+          const parsedH = JSON.parse(savedHistory);
+          if (Array.isArray(parsedH) && parsedH.length > 0) matchHistoryLog = parsedH;
+        }
+      } catch (e) {}
+    }
+
+    function saveRunResult(name, distance, bananas, rankStr) {
+      const skinObj = SKINS[gameState.selectedSkinIndex];
+      const modeStr = gameState.isMultiplayer ? 'Multiplayer' : 'Single Player';
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const entry = {
+        name: name || 'MonkeyKing',
+        distance: distance,
+        bananas: bananas,
+        skin: `${skinObj.icon} ${skinObj.name}`,
+        mode: modeStr,
+        rank: rankStr,
+        time: timeStr,
+        isCurrentUser: true
+      };
+
+      matchHistoryLog.unshift(entry);
+      matchHistoryLog = matchHistoryLog.slice(0, 30);
+
+      globalLeaderboard.push(entry);
+      globalLeaderboard.sort((a, b) => b.distance - a.distance);
+      globalLeaderboard = globalLeaderboard.slice(0, 15);
+
+      try {
+        localStorage.setItem('monkey_runner_player_name', name || 'MonkeyKing');
+        localStorage.setItem('monkey_runner_leaderboard_v2', JSON.stringify(globalLeaderboard));
+        localStorage.setItem('monkey_runner_history_v2', JSON.stringify(matchHistoryLog));
+      } catch (e) {}
+    }
+
+    loadSavedData();
+
+    // --- Three.js Scene ---
+    const canvas = document.getElementById('game-canvas');
+    const scene = new THREE.Scene();
+
+    const currentFogColor = new THREE.Color(BIOMES[0].fogColor);
+    scene.background = currentFogColor;
+    scene.fog = new THREE.FogExp2(BIOMES[0].fogColor, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 400);
+    camera.position.set(0, 4.6, 7.5);
+    camera.lookAt(0, 1.8, -12);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+
+    // --- Sky Dome ---
+    const skyGeo = new THREE.SphereGeometry(260, 24, 18);
+    const skyCanvas = document.createElement('canvas');
+    skyCanvas.width = 128;
+    skyCanvas.height = 256;
+    const skyCtx = skyCanvas.getContext('2d');
+
+    function drawSkyGradient(colors) {
+      const grad = skyCtx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, colors[0]);
+      grad.addColorStop(0.45, colors[1]);
+      grad.addColorStop(0.72, colors[2]);
+      grad.addColorStop(0.88, colors[3]);
+      grad.addColorStop(1.0, colors[4]);
+      skyCtx.fillStyle = grad;
+      skyCtx.fillRect(0, 0, 128, 256);
+    }
+    drawSkyGradient(BIOMES[0].skyColors);
+
+    const skyTex = new THREE.CanvasTexture(skyCanvas);
+    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false });
+    const skyDome = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(skyDome);
+
+    // --- Mountains & Lighting ---
+    const mountainGroup = new THREE.Group();
+    scene.add(mountainGroup);
+
+    function createMountainRidge(distanceZ, heightScale, colorHex) {
+      const ridgeGeo = new THREE.ConeGeometry(55, heightScale, 5);
+      const ridgeMat = new THREE.MeshBasicMaterial({ color: colorHex, fog: true });
+      for (let i = -4; i <= 4; i++) {
+        const peak = new THREE.Mesh(ridgeGeo, ridgeMat);
+        peak.position.set(i * 45 + (Math.sin(i * 3) * 12), heightScale * 0.42, distanceZ);
+        peak.scale.set(1 + Math.sin(i * 2) * 0.3, 1, 0.4);
+        mountainGroup.add(peak);
+      }
+    }
+    createMountainRidge(-180, 75, 0x122419);
+    createMountainRidge(-130, 55, 0x183022);
+
+    const hemiLight = new THREE.HemisphereLight(BIOMES[0].hemiSky, BIOMES[0].hemiGround, 0.7);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(BIOMES[0].sunColor, 1.4);
+    sunLight.position.set(16, 32, 16);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 1024;
+    sunLight.shadow.mapSize.height = 1024;
+    sunLight.shadow.camera.near = 1;
+    sunLight.shadow.camera.far = 120;
+    sunLight.shadow.camera.left = -18;
+    sunLight.shadow.camera.right = 18;
+    sunLight.shadow.camera.top = 26;
+    sunLight.shadow.camera.bottom = -12;
+    sunLight.shadow.bias = -0.0008;
+    scene.add(sunLight);
+
+    // --- Player Monkey Model with Customizable Skins ---
+    const monkeyGroup = new THREE.Group();
+    scene.add(monkeyGroup);
+
+    const furMaterial = new THREE.MeshStandardMaterial({ color: SKINS[0].fur, roughness: 0.78, metalness: 0.1 });
+    const bellyMaterial = new THREE.MeshStandardMaterial({ color: SKINS[0].belly, roughness: 0.8, metalness: 0.05 });
+    const playerVestMat = new THREE.MeshStandardMaterial({ color: SKINS[0].vest, roughness: 0.4, metalness: 0.3 });
+    const snoutMaterial = new THREE.MeshStandardMaterial({ color: 0xbe885d, roughness: 0.72, metalness: 0.0 });
+    const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.1, metalness: 0.9 });
+
+    function createLimb(length, radius, material) {
+      const group = new THREE.Group();
+      const geom = new THREE.CylinderGeometry(radius * 0.85, radius, length, 10);
+      geom.translate(0, -length / 2, 0);
+      const mesh = new THREE.Mesh(geom, material);
+      mesh.castShadow = true;
+      group.add(mesh);
+      return group;
+    }
+
+    const torsoGeo = new THREE.SphereGeometry(0.56, 16, 16);
+    torsoGeo.scale(0.85, 1.15, 0.82);
+    const torsoMesh = new THREE.Mesh(torsoGeo, furMaterial);
+    torsoMesh.position.y = 1.05;
+    torsoMesh.castShadow = true;
+    monkeyGroup.add(torsoMesh);
+
+    const playerVestMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.49, 0.51, 0.62, 12), playerVestMat);
+    playerVestMesh.position.y = 1.08;
+    monkeyGroup.add(playerVestMesh);
+
+    const bellyGeo = new THREE.SphereGeometry(0.44, 16, 16);
+    bellyGeo.scale(0.72, 0.95, 0.38);
+    const bellyMesh = new THREE.Mesh(bellyGeo, bellyMaterial);
+    bellyMesh.position.set(0, 1.02, -0.29);
+    monkeyGroup.add(bellyMesh);
+
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 1.72, 0);
+    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 16), furMaterial);
+    headMesh.castShadow = true;
+    headGroup.add(headMesh);
+
+    const snoutGeo = new THREE.SphereGeometry(0.24, 14, 14);
+    snoutGeo.scale(0.92, 0.76, 1.05);
+    const snoutMesh = new THREE.Mesh(snoutGeo, snoutMaterial);
+    snoutMesh.position.set(0, -0.08, -0.28);
+    headGroup.add(snoutMesh);
+
+    const accHeadband = new THREE.Mesh(new THREE.CylinderGeometry(0.425, 0.425, 0.12, 16), playerVestMat);
+    accHeadband.position.y = 0.12;
+    headGroup.add(accHeadband);
+
+    const accCrown = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.22, 0.24, 6),
+      new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.2 })
+    );
+    accCrown.position.y = 0.45;
+    accCrown.visible = false;
+    headGroup.add(accCrown);
+
+    const accVisor = new THREE.Mesh(
+      new THREE.BoxGeometry(0.56, 0.18, 0.32),
+      new THREE.MeshBasicMaterial({ color: 0x00ffff })
+    );
+    accVisor.position.set(0, 0.08, -0.28);
+    accVisor.visible = false;
+    headGroup.add(accVisor);
+
+    const earGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.06, 14);
+    earGeo.rotateZ(Math.PI / 2);
+    const leftEar = new THREE.Mesh(earGeo, furMaterial);
+    leftEar.position.set(-0.43, 0.05, 0);
+    const rightEar = new THREE.Mesh(earGeo, furMaterial);
+    rightEar.position.set(0.43, 0.05, 0);
+    headGroup.add(leftEar, rightEar);
+    monkeyGroup.add(headGroup);
+
+    const leftArm = createLimb(0.72, 0.11, furMaterial);
+    leftArm.position.set(-0.43, 1.42, 0);
+    const rightArm = createLimb(0.72, 0.11, furMaterial);
+    rightArm.position.set(0.43, 1.42, 0);
+    monkeyGroup.add(leftArm, rightArm);
+
+    const leftLeg = createLimb(0.76, 0.14, furMaterial);
+    leftLeg.position.set(-0.25, 0.74, 0);
+    const rightLeg = createLimb(0.76, 0.14, furMaterial);
+    rightLeg.position.set(0.25, 0.74, 0);
+    monkeyGroup.add(leftLeg, rightLeg);
+
+    const tailGroup = new THREE.Group();
+    tailGroup.position.set(0, 0.7, 0.38);
+    const tailSegments = [];
+    let parentNode = tailGroup;
+    for (let i = 0; i < 6; i++) {
+      const segLength = 0.22;
+      const segGeo = new THREE.CylinderGeometry(0.06 - i * 0.006, 0.07 - i * 0.006, segLength, 8);
+      segGeo.translate(0, segLength / 2, 0);
+      const segMesh = new THREE.Mesh(segGeo, furMaterial);
+      const node = new THREE.Group();
+      node.add(segMesh);
+      parentNode.add(node);
+      if (i > 0) node.position.y = segLength;
+      tailSegments.push(node);
+      parentNode = node;
+    }
+    monkeyGroup.add(tailGroup);
+
+    function createNameSprite(text, bgColorHex) {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 64;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(16, 8, 224, 48);
+      ctx.strokeStyle = bgColorHex;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(16, 8, 224, 48);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, 128, 41);
+
+      const tex = new THREE.CanvasTexture(c);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(2.2, 0.55, 1);
+      sprite.position.set(0, 2.55, 0);
+      return sprite;
+    }
+
+    let playerNameSprite = createNameSprite(gameState.playerName, '#34d399');
+    monkeyGroup.add(playerNameSprite);
+
+    function updatePlayerNameSprite(newName) {
+      monkeyGroup.remove(playerNameSprite);
+      playerNameSprite = createNameSprite(newName, '#34d399');
+      monkeyGroup.add(playerNameSprite);
+    }
+
+    function applyMonkeySkin(index) {
+      gameState.selectedSkinIndex = index;
+      const skin = SKINS[index];
+      furMaterial.color.setHex(skin.fur);
+      bellyMaterial.color.setHex(skin.belly);
+      playerVestMat.color.setHex(skin.vest);
+
+      accHeadband.visible = (skin.accessory === 'headband');
+      accCrown.visible = (skin.accessory === 'crown');
+      accVisor.visible = (skin.accessory === 'visor');
+
+      document.getElementById('selected-skin-label').textContent = `${skin.icon} ${skin.name}`;
+      renderSkinButtons();
+    }
+
+    // --- 3D Flying Car Attachment (15s Flight) ---
+    const flyingCarVehicle = new THREE.Group();
+    flyingCarVehicle.visible = false;
+    monkeyGroup.add(flyingCarVehicle);
+
+    const carPaintMat = new THREE.MeshStandardMaterial({ color: 0x00c4d6, roughness: 0.25, metalness: 0.8 });
+    const carGlassMat = new THREE.MeshStandardMaterial({ color: 0x112233, roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.85 });
+    const carGlowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+    const carThrusterFlameMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+
+    const carBody = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.45, 2.6), carPaintMat);
+    carBody.position.set(0, 0.45, 0);
+    const carCockpit = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.45, 1.3), carGlassMat);
+    carCockpit.position.set(0, 0.85, -0.15);
+    const leftWing = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.7), carPaintMat);
+    leftWing.position.set(-1.15, 0.45, 0.2);
+    const rightWing = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.7), carPaintMat);
+    rightWing.position.set(1.15, 0.45, 0.2);
+
+    const thrusterGeo = new THREE.CylinderGeometry(0.2, 0.24, 0.65, 12);
+    thrusterGeo.rotateX(Math.PI / 2);
+    const tLeft = new THREE.Mesh(thrusterGeo, carPaintMat);
+    tLeft.position.set(-0.55, 0.45, 1.3);
+    const tRight = new THREE.Mesh(thrusterGeo, carPaintMat);
+    tRight.position.set(0.55, 0.45, 1.3);
+
+    const flameGeo = new THREE.ConeGeometry(0.18, 0.8, 8);
+    flameGeo.rotateX(-Math.PI / 2);
+    const flameLeft = new THREE.Mesh(flameGeo, carThrusterFlameMat);
+    flameLeft.position.set(0, 0, 0.55);
+    tLeft.add(flameLeft);
+    const flameRight = new THREE.Mesh(flameGeo, carThrusterFlameMat);
+    flameRight.position.set(0, 0, 0.55);
+    tRight.add(flameRight);
+
+    flyingCarVehicle.add(carBody, carCockpit, leftWing, rightWing, tLeft, tRight);
+
+    // --- 3D Hoverboard Attachment ---
+    const hoverboardMesh = new THREE.Group();
+    hoverboardMesh.visible = false;
+    monkeyGroup.add(hoverboardMesh);
+    const boardMat = new THREE.MeshStandardMaterial({ color: 0x9333ea, roughness: 0.3, metalness: 0.7 });
+    const boardDeck = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 2.2), boardMat);
+    boardDeck.position.set(0, 0.08, 0);
+    hoverboardMesh.add(boardDeck);
+
+    // --- 5 Smart AI Monkey Bots for 6-Player Multiplayer Racing! ---
+    const aiBots = [];
+    const BOT_CONFIGS = [
+      { name: 'Koko AI',    color: 0xef4444, fur: 0x6b4226, textHex: '#f87171', startLane: 0, zOffset: -4,  basePace: 1.01 },
+      { name: 'Bobo Pro',   color: 0x06b6d4, fur: 0x1e293b, textHex: '#22d3ee', startLane: 2, zOffset: -7,  basePace: 1.03 },
+      { name: 'Zazu Turbo', color: 0xa855f7, fur: 0xd97706, textHex: '#c084fc', startLane: 0, zOffset: -2,  basePace: 0.99 },
+      { name: 'Momo Nitro', color: 0xfacc15, fur: 0x111827, textHex: '#fde047', startLane: 2, zOffset: -10, basePace: 1.02 },
+      { name: 'Rico Rex',   color: 0xf97316, fur: 0xe2e8f0, textHex: '#fb923c', startLane: 1, zOffset: -13, basePace: 0.98 }
+    ];
+
+    function createBotMonkey(cfg) {
+      const botGroup = new THREE.Group();
+      const botFur = new THREE.MeshStandardMaterial({ color: cfg.fur, roughness: 0.8 });
+      const vestMat = new THREE.MeshStandardMaterial({ color: cfg.color, roughness: 0.4, metalness: 0.3 });
+
+      const bTorso = new THREE.Mesh(torsoGeo, botFur);
+      bTorso.position.y = 1.05;
+      bTorso.castShadow = true;
+      botGroup.add(bTorso);
+
+      const vest = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.5, 0.65, 12), vestMat);
+      vest.position.y = 1.1;
+      botGroup.add(vest);
+
+      const bHead = new THREE.Mesh(new THREE.SphereGeometry(0.4, 14, 14), botFur);
+      bHead.position.y = 1.72;
+      botGroup.add(bHead);
+
+      const headband = new THREE.Mesh(new THREE.CylinderGeometry(0.41, 0.41, 0.12, 14), vestMat);
+      headband.position.y = 1.82;
+      botGroup.add(headband);
+
+      const bLArm = createLimb(0.7, 0.1, botFur);
+      bLArm.position.set(-0.42, 1.4, 0);
+      const bRArm = createLimb(0.7, 0.1, botFur);
+      bRArm.position.set(0.42, 1.4, 0);
+      const bLLeg = createLimb(0.74, 0.13, botFur);
+      bLLeg.position.set(-0.24, 0.72, 0);
+      const bRLeg = createLimb(0.74, 0.13, botFur);
+      bRLeg.position.set(0.24, 0.72, 0);
+      botGroup.add(bLArm, bRArm, bLLeg, bRLeg);
+
+      const label = createNameSprite(cfg.name, cfg.textHex);
+      botGroup.add(label);
+
+      scene.add(botGroup);
+
+      return {
+        name: cfg.name,
+        textHex: cfg.textHex,
+        group: botGroup,
+        leftArm: bLArm,
+        rightArm: bRArm,
+        leftLeg: bLLeg,
+        rightLeg: bRLeg,
+        lane: cfg.startLane,
+        targetX: CONFIG.lanes[cfg.startLane],
+        zRel: cfg.zOffset,
+        y: 0,
+        vy: 0,
+        isGrounded: true,
+        distance: 0,
+        bananas: 0,
+        basePace: cfg.basePace,
+        decisionCooldown: 0
+      };
+    }
+
+    BOT_CONFIGS.forEach(cfg => {
+      aiBots.push(createBotMonkey(cfg));
+    });
+
+    // --- 3D Human Catcher ---
+    const humanGroup = new THREE.Group();
+    scene.add(humanGroup);
+    humanGroup.position.set(0, 0, 4.2);
+
+    const humanUniformMat = new THREE.MeshStandardMaterial({ color: 0x9c7f55, roughness: 0.8 });
+    const humanSkinMat = new THREE.MeshStandardMaterial({ color: 0xd69a74, roughness: 0.7 });
+    const humanPantsMat = new THREE.MeshStandardMaterial({ color: 0x2b382d, roughness: 0.85 });
+    const humanHatMat = new THREE.MeshStandardMaterial({ color: 0x6e583c, roughness: 0.8 });
+
+    const hTorso = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.1, 0.5), humanUniformMat);
+    hTorso.position.y = 1.7;
+    hTorso.castShadow = true;
+    humanGroup.add(hTorso);
+
+    const hHeadGroup = new THREE.Group();
+    hHeadGroup.position.set(0, 2.45, 0);
+    const hHead = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 14), humanSkinMat);
+    const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.35, 0.3, 14), humanHatMat);
+    hatCrown.position.y = 0.26;
+    const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.04, 16), humanHatMat);
+    hatBrim.position.y = 0.12;
+    hHeadGroup.add(hHead, hatCrown, hatBrim);
+    humanGroup.add(hHeadGroup);
+
+    const hLeftArm = createLimb(0.85, 0.13, humanUniformMat);
+    hLeftArm.position.set(-0.52, 2.15, 0);
+    const hRightArm = createLimb(0.85, 0.13, humanUniformMat);
+    hRightArm.position.set(0.52, 2.15, 0);
+    const hLeftLeg = createLimb(0.95, 0.16, humanPantsMat);
+    hLeftLeg.position.set(-0.25, 1.15, 0);
+    const hRightLeg = createLimb(0.95, 0.16, humanPantsMat);
+    hRightLeg.position.set(0.25, 1.15, 0);
+    humanGroup.add(hLeftArm, hRightArm, hLeftLeg, hRightLeg);
+
+    // --- Environment & Dynamic Scenery Materials ---
+    const groundMaterial = new THREE.MeshStandardMaterial({ color: BIOMES[0].groundColor, roughness: 0.95, metalness: 0.05 });
+    const ballastMaterial = new THREE.MeshStandardMaterial({ color: 0x221f1d, roughness: 0.95 });
+    const sleeperMaterial = new THREE.MeshStandardMaterial({ color: 0x3d2719, roughness: 0.85 });
+    const railMaterial = new THREE.MeshStandardMaterial({ color: 0xa0acb5, roughness: 0.25, metalness: 0.85 });
+    const bananaMaterial = new THREE.MeshStandardMaterial({ color: 0xffd200, roughness: 0.32, metalness: 0.15, emissive: 0x664800 });
+
+    // Dynamic Scenery Prop Materials (Updated when Biome changes!)
+    const sceneryPrimaryMat = new THREE.MeshStandardMaterial({ color: BIOMES[0].propPrimary, roughness: 0.8 });
+    const scenerySecondaryMat = new THREE.MeshStandardMaterial({ color: BIOMES[0].propSecondary, roughness: 0.5, side: THREE.DoubleSide });
+    const stoneArchMaterial = new THREE.MeshStandardMaterial({ color: 0x475249, roughness: 0.9 });
+
+    // Bike Materials
+    const bikeBodyMat = new THREE.MeshStandardMaterial({ color: 0xdd2211, roughness: 0.3, metalness: 0.6 });
+    const bikeTireMat = new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.85 });
+    const bikeChromeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.2, metalness: 0.9 });
+    const headlightMat = new THREE.MeshBasicMaterial({ color: 0xfff6c2 });
+
+    function createMotorbike() {
+      const bike = new THREE.Group();
+      const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.22, 14);
+      wheelGeo.rotateZ(Math.PI / 2);
+
+      const frontWheel = new THREE.Mesh(wheelGeo, bikeTireMat);
+      frontWheel.position.set(0, 0.55, -1.25);
+      const rearWheel = new THREE.Mesh(wheelGeo, bikeTireMat);
+      rearWheel.position.set(0, 0.55, 1.25);
+      bike.add(frontWheel, rearWheel);
+
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.6, 1.8), bikeBodyMat);
+      body.position.set(0, 0.95, 0);
+      bike.add(body);
+
+      const handleBar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.2, 8), bikeChromeMat);
+      handleBar.rotation.z = Math.PI / 2;
+      handleBar.position.set(0, 1.5, -0.85);
+      bike.add(handleBar);
+
+      const lightLens = new THREE.Mesh(new THREE.CircleGeometry(0.18, 10), headlightMat);
+      lightLens.position.set(0, 1.3, -1.51);
+      lightLens.rotation.y = Math.PI;
+      bike.add(lightLens);
+
+      const riderTorso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.4), humanUniformMat);
+      riderTorso.position.set(0, 1.8, 0.2);
+      riderTorso.rotation.x = -0.3;
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 10), bikeBodyMat);
+      helmet.position.set(0, 2.35, -0.05);
+      bike.add(riderTorso, helmet);
+
+      return { group: bike, frontWheel, rearWheel };
+    }
+
+    const trainBodyMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.35, metalness: 0.6 });
+    const trainStripeMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.4 });
+    const trainRoofMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.6, metalness: 0.7 });
+    const trainLightMat = new THREE.MeshBasicMaterial({ color: 0xfffbeb });
+
+    function createSubwayTrain(length = 26) {
+      const train = new THREE.Group();
+      const car = new THREE.Mesh(new THREE.BoxGeometry(2.35, 3.4, length), trainBodyMat);
+      car.position.y = 1.7;
+      car.castShadow = true;
+      car.receiveShadow = true;
+      train.add(car);
+
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.38, 0.35, length), trainStripeMat);
+      stripe.position.y = 1.5;
+      train.add(stripe);
+
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.22, length), trainRoofMat);
+      roof.position.y = 3.5;
+      roof.receiveShadow = true;
+      train.add(roof);
+
+      const light1 = new THREE.Mesh(new THREE.CircleGeometry(0.24, 12), trainLightMat);
+      light1.position.set(-0.65, 1.1, -length / 2 - 0.02);
+      light1.rotation.y = Math.PI;
+      const light2 = new THREE.Mesh(new THREE.CircleGeometry(0.24, 12), trainLightMat);
+      light2.position.set(0.65, 1.1, -length / 2 - 0.02);
+      light2.rotation.y = Math.PI;
+      train.add(light1, light2);
+
+      return train;
+    }
+
+    function createPowerupItem(type) {
+      const group = new THREE.Group();
+      if (type === 'flying_car') {
+        const miniCar = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.35, 1.8), carPaintMat);
+        miniCar.position.y = 0.8;
+        const auraRing = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.08, 8, 24), carGlowMat);
+        auraRing.rotation.x = Math.PI / 2;
+        auraRing.position.y = 0.85;
+        group.add(miniCar, auraRing);
+      } else if (type === 'hoverboard') {
+        const board = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.12, 1.6), boardMat);
+        board.position.y = 0.8;
+        const aura = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.06, 8, 20), new THREE.MeshBasicMaterial({ color: 0xc084fc }));
+        aura.rotation.x = Math.PI / 2;
+        aura.position.y = 0.85;
+        group.add(board, aura);
+      } else if (type === 'magnet') {
+        const mag = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.18, 8, 16, Math.PI), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+        mag.rotation.z = Math.PI;
+        mag.position.y = 0.85;
+        group.add(mag);
+      }
+      return group;
+    }
+
+    function createSceneryProp() {
+      const prop = new THREE.Group();
+      const trunkH = 8 + Math.random() * 4;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, trunkH, 8), sceneryPrimaryMat);
+      trunk.position.y = trunkH / 2;
+      trunk.castShadow = true;
+      prop.add(trunk);
+
+      const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(2.6 + Math.random() * 0.7), scenerySecondaryMat);
+      crown.position.y = trunkH + 1.1;
+      crown.castShadow = true;
+      prop.add(crown);
+
+      return prop;
+    }
+
+    const chunks = [];
+    const activeObstacles = [];
+    const activeBananas = [];
+    const activeTrains = [];
+    const activeBikes = [];
+    const activePickups = [];
+
+    function createBananaMesh() {
+      const group = new THREE.Group();
+      const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.28, 8), bananaMaterial);
+      b1.rotation.z = -0.32;
+      const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.32, 8), bananaMaterial);
+      b2.position.set(0.05, 0.24, 0);
+      const b3 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.12, 0.25, 8), bananaMaterial);
+      b3.position.set(-0.02, 0.48, 0);
+      b3.rotation.z = 0.38;
+      group.add(b1, b2, b3);
+      group.scale.set(1.15, 1.15, 1.15);
+      return group;
+    }
+
+    function createTrackChunk(zPos) {
+      const chunk = new THREE.Group();
+      chunk.position.z = zPos;
+
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(44, CONFIG.chunkLength), groundMaterial);
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      chunk.add(ground);
+
+      const ballast = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.14, CONFIG.chunkLength), ballastMaterial);
+      ballast.position.y = 0.07;
+      ballast.receiveShadow = true;
+      chunk.add(ballast);
+
+      const sleeperCount = 20;
+      const sleeperStep = CONFIG.chunkLength / sleeperCount;
+      const sleeperGeo = new THREE.BoxGeometry(9.0, 0.18, 0.62);
+      for (let i = 0; i < sleeperCount; i++) {
+        const sleeper = new THREE.Mesh(sleeperGeo, sleeperMaterial);
+        sleeper.position.set(0, 0.15, -CONFIG.chunkLength / 2 + i * sleeperStep);
+        sleeper.receiveShadow = true;
+        chunk.add(sleeper);
+      }
+
+      const railGeo = new THREE.BoxGeometry(0.14, 0.24, CONFIG.chunkLength);
+      const railOffsets = [-4.0, -1.6, 1.6, 4.0];
+      railOffsets.forEach(x => {
+        const rail = new THREE.Mesh(railGeo, railMaterial);
+        rail.position.set(x, 0.30, 0);
+        rail.castShadow = true;
+        chunk.add(rail);
+      });
+
+      // Rich Side Scenery Props (Trees, Towers, Pillars) on both sides of the track
+      for (let side of [-1, 1]) {
+        for (let j = 0; j < 3; j++) {
+          const prop = createSceneryProp();
+          const posX = side * (8.5 + Math.random() * 5.5);
+          const posZ = -CONFIG.chunkLength / 2 + (j * 14) + Math.random() * 4;
+          prop.position.set(posX, 0, posZ);
+          chunk.add(prop);
+
+          if (Math.random() < 0.55) {
+            const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.3, 5.2, 1.3), stoneArchMaterial);
+            pillar.position.set(side * (6.4 + Math.random() * 1.4), 2.6, posZ + 5);
+            pillar.castShadow = true;
+            chunk.add(pillar);
+          }
+        }
+      }
+
+      scene.add(chunk);
+      return chunk;
+    }
+
+    function spawnBikeAt(laneIdx, zWorld) {
+      const bikeObj = createMotorbike();
+      const laneX = CONFIG.lanes[laneIdx];
+      bikeObj.group.position.set(laneX, 0, zWorld);
+      scene.add(bikeObj.group);
+
+      activeBikes.push({
+        group: bikeObj.group,
+        frontWheel: bikeObj.frontWheel,
+        rearWheel: bikeObj.rearWheel,
+        lane: laneIdx,
+        z: zWorld,
+        prevZ: zWorld,
+        speed: 20 + Math.random() * 6
+      });
+    }
+
+    function spawnTrainAt(laneIdx, zWorld, isMoving = false) {
+      const train = createSubwayTrain(26);
+      const laneX = CONFIG.lanes[laneIdx];
+      train.position.set(laneX, 0, zWorld);
+      scene.add(train);
+
+      activeTrains.push({
+        group: train,
+        lane: laneIdx,
+        z: zWorld,
+        prevZ: zWorld,
+        length: 26,
+        isMoving: isMoving,
+        speed: isMoving ? (14 + Math.random() * 8) : 0
+      });
+    }
+
+    function spawnPowerupAt(type, laneIdx, zWorld) {
+      const pItem = createPowerupItem(type);
+      const laneX = CONFIG.lanes[laneIdx];
+      pItem.position.set(laneX, 0.3, zWorld);
+      scene.add(pItem);
+
+      activePickups.push({
+        group: pItem,
+        type: type,
+        lane: laneIdx,
+        z: zWorld,
+        collected: false
+      });
+    }
+
+    function spawnObstacleAt(laneIdx, zWorld) {
+      const laneX = CONFIG.lanes[laneIdx];
+      let obsGroup = new THREE.Group();
+      let hitbox = { minX: laneX - 1.1, maxX: laneX + 1.1, minY: 0, maxY: 1.05, type: 'hurdle' };
+
+      if (Math.random() < 0.6) {
+        const hurdle = new THREE.Group();
+        const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.15, 0.18), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
+        p1.position.set(-1.0, 0.58, 0);
+        const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.15, 0.18), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
+        p2.position.set(1.0, 0.58, 0);
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.26, 0.16), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
+        bar.position.set(0, 0.98, 0);
+        hurdle.add(p1, p2, bar);
+        obsGroup.add(hurdle);
+      } else {
+        // Low Tunnel Arch (Must Slide Under)
+        hitbox.type = 'low_tunnel';
+        hitbox.minY = 1.0;
+        hitbox.maxY = 3.2;
+        const arch = new THREE.Group();
+        const colGeo = new THREE.BoxGeometry(0.45, 3.2, 0.55);
+        const c1 = new THREE.Mesh(colGeo, stoneArchMaterial);
+        c1.position.set(-1.25, 1.6, 0);
+        const c2 = new THREE.Mesh(colGeo, stoneArchMaterial);
+        c2.position.set(1.25, 1.6, 0);
+        const top = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.9, 0.65), stoneArchMaterial);
+        top.position.set(0, 2.65, 0);
+        arch.add(c1, c2, top);
+        obsGroup.add(arch);
+      }
+
+      obsGroup.position.set(laneX, 0, zWorld);
+      scene.add(obsGroup);
+
+      activeObstacles.push({
+        group: obsGroup,
+        hitbox: hitbox,
+        lane: laneIdx,
+        z: zWorld,
+        prevZ: zWorld
+      });
+    }
+
+    function spawnBananaCluster(laneIdx, zStart, altitude = 1.2) {
+      const count = 4;
+      const step = 2.3;
+      for (let i = 0; i < count; i++) {
+        const bMesh = createBananaMesh();
+        const zPos = zStart - i * step;
+        bMesh.position.set(CONFIG.lanes[laneIdx], altitude, zPos);
+        scene.add(bMesh);
+        activeBananas.push({
+          mesh: bMesh,
+          lane: laneIdx,
+          z: zPos,
+          altitude: altitude,
+          collected: false
+        });
+      }
+    }
+
+    function initTrack() {
+      for (let i = 0; i < CONFIG.chunkCount; i++) {
+        const zPos = -i * CONFIG.chunkLength;
+        const chunk = createTrackChunk(zPos);
+        chunks.push(chunk);
+
+        if (i >= 2) {
+          const blockedLane = Math.floor(Math.random() * 3);
+          const rand = Math.random();
+
+          if (rand < 0.22 && activePickups.length === 0) {
+            const types = ['flying_car', 'hoverboard', 'magnet'];
+            spawnPowerupAt(types[Math.floor(Math.random() * types.length)], blockedLane, zPos);
+          } else if (rand < 0.45) {
+            spawnBikeAt(blockedLane, zPos);
+          } else if (rand < 0.72) {
+            spawnTrainAt(blockedLane, zPos, Math.random() < 0.5);
+          } else {
+            spawnObstacleAt(blockedLane, zPos);
+          }
+
+          const bananaLane = (blockedLane + 1) % 3;
+          spawnBananaCluster(bananaLane, zPos + 8, 1.2);
+        }
+      }
+    }
+
+    initTrack();
+
+    // --- UI Builders for Skins & World Selectors ---
+    function renderSkinButtons() {
+      const grid = document.getElementById('skin-selector-grid');
+      grid.innerHTML = '';
+      SKINS.forEach((sk, idx) => {
+        const active = (idx === gameState.selectedSkinIndex);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `p-1.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center ${active ? 'bg-yellow-500/30 border-yellow-400 text-white shadow-lg scale-105' : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'}`;
+        btn.innerHTML = `
+          <span class="text-base leading-none">${sk.icon}</span>
+          <span class="text-[9px] font-bold mt-1 truncate w-full">${sk.name.split(' ')[0]}</span>
+        `;
+        btn.addEventListener('click', () => applyMonkeySkin(idx));
+        grid.appendChild(btn);
+      });
+    }
+
+    function applyBiomeEnvironment(biomeIdx, showToast = false) {
+      gameState.currentBiomeIndex = biomeIdx;
+      const b = BIOMES[biomeIdx];
+      drawSkyGradient(b.skyColors);
+      skyTex.needsUpdate = true;
+      scene.fog.color.setHex(b.fogColor);
+      scene.background.setHex(b.fogColor);
+      groundMaterial.color.setHex(b.groundColor);
+      sceneryPrimaryMat.color.setHex(b.propPrimary);
+      scenerySecondaryMat.color.setHex(b.propSecondary);
+      sunLight.color.setHex(b.sunColor);
+      hemiLight.color.setHex(b.hemiSky);
+      hemiLight.groundColor.setHex(b.hemiGround);
+      document.getElementById('biome-tag-icon').textContent = b.icon;
+      document.getElementById('biome-tag-text').textContent = b.short;
+      if (showToast) showBiomeNotification(b);
+    }
+
+    function renderWorldButtons() {
+      const grid = document.getElementById('world-selector-grid');
+      grid.innerHTML = '';
+      BIOMES.forEach((bm, idx) => {
+        const active = (idx === gameState.startingBiomeIndex);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `p-1.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center ${active ? 'bg-cyan-500/30 border-cyan-400 text-white shadow-lg scale-105' : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'}`;
+        btn.innerHTML = `
+          <span class="text-base leading-none">${bm.icon}</span>
+          <span class="text-[9px] font-bold mt-1 truncate w-full">${bm.short}</span>
+        `;
+        btn.addEventListener('click', () => {
+          gameState.startingBiomeIndex = idx;
+          document.getElementById('selected-world-label').textContent = `${bm.icon} ${bm.name}`;
+          applyBiomeEnvironment(idx, false);
+          renderWorldButtons();
+        });
+        grid.appendChild(btn);
+      });
+    }
+
+    renderSkinButtons();
+    renderWorldButtons();
+
+    // Click HUD Biome Tag to cycle backgrounds anytime!
+    document.getElementById('biome-tag').addEventListener('click', () => {
+      const nextB = (gameState.currentBiomeIndex + 1) % BIOMES.length;
+      gameState.startingBiomeIndex = nextB;
+      renderWorldButtons();
+      applyBiomeEnvironment(nextB, true);
+    });
+
+    // --- Inputs ---
+    function moveLeft() {
+      if (!gameState.running || gameState.paused || gameState.isCaught) return;
+      if (gameState.currentLane > 0) {
+        gameState.currentLane--;
+        gameState.targetX = CONFIG.lanes[gameState.currentLane];
+      }
+    }
+
+    function moveRight() {
+      if (!gameState.running || gameState.paused || gameState.isCaught) return;
+      if (gameState.currentLane < 2) {
+        gameState.currentLane++;
+        gameState.targetX = CONFIG.lanes[gameState.currentLane];
+      }
+    }
+
+    function jump() {
+      if (!gameState.running || gameState.paused || gameState.isCaught || gameState.isFlying) return;
+      if (gameState.isGrounded && !gameState.isSliding) {
+        gameState.monkeyVelocityY = CONFIG.jumpVelocity;
+        gameState.isGrounded = false;
+        sound.playJump();
+      }
+    }
+
+    function slide() {
+      if (!gameState.running || gameState.paused || gameState.isCaught || gameState.isFlying) return;
+      if (gameState.isGrounded && !gameState.isSliding) {
+        gameState.isSliding = true;
+        gameState.slideTimer = CONFIG.slideDuration;
+        sound.playSlide();
+      } else if (!gameState.isGrounded) {
+        gameState.monkeyVelocityY = -26;
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement === document.getElementById('player-name-input')) return;
+      sound.init();
+      switch (e.key) {
+        case 'ArrowLeft': case 'a': case 'A': moveLeft(); break;
+        case 'ArrowRight': case 'd': case 'D': moveRight(); break;
+        case 'ArrowUp': case 'w': case 'W': case ' ': e.preventDefault(); jump(); break;
+        case 'ArrowDown': case 's': case 'S': e.preventDefault(); slide(); break;
+      }
+    });
+
+    document.getElementById('btn-left').addEventListener('click', () => { sound.init(); moveLeft(); });
+    document.getElementById('btn-right').addEventListener('click', () => { sound.init(); moveRight(); });
+    document.getElementById('btn-jump').addEventListener('click', () => { sound.init(); jump(); });
+    document.getElementById('btn-slide').addEventListener('click', () => { sound.init(); slide(); });
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    window.addEventListener('touchstart', (e) => {
+      sound.init();
+      touchStartX = e.changedTouches[0].screenX;
+      touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      const deltaX = e.changedTouches[0].screenX - touchStartX;
+      const deltaY = e.changedTouches[0].screenY - touchStartY;
+      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 28) {
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          if (deltaX > 0) moveRight(); else moveLeft();
+        } else {
+          if (deltaY < 0) jump(); else slide();
+        }
+      }
+    }, { passive: true });
+
+    // --- UI & Mode Handlers ---
+    const startOverlay = document.getElementById('start-overlay');
+    const gameoverOverlay = document.getElementById('gameover-overlay');
+    const leaderboardModal = document.getElementById('leaderboard-modal');
+    const bananaCountEl = document.getElementById('banana-count');
+    const distanceCountEl = document.getElementById('distance-count');
+    const biomeBanner = document.getElementById('biome-banner');
+    const biomeBannerIcon = document.getElementById('biome-banner-icon');
+    const biomeBannerText = document.getElementById('biome-banner-text');
+    const biomeBannerBox = document.getElementById('biome-banner-box');
+    const flyTimerContainer = document.getElementById('fly-timer-container');
+    const flyTimerText = document.getElementById('fly-timer-text');
+    const hoverboardContainer = document.getElementById('hoverboard-container');
+    const hoverboardTimerText = document.getElementById('hoverboard-timer-text');
+    const magnetContainer = document.getElementById('magnet-container');
+    const magnetTimerText = document.getElementById('magnet-timer-text');
+    const liveRaceBoard = document.getElementById('live-race-board');
+    const liveStandingsList = document.getElementById('live-standings-list');
+    const playerRankBadge = document.getElementById('player-rank-badge');
+    const pauseBtn = document.getElementById('pause-btn');
+    const muteBtn = document.getElementById('mute-btn');
+    const modeMultiBtn = document.getElementById('mode-multi-btn');
+    const modeSoloBtn = document.getElementById('mode-solo-btn');
+    const hudModeBtn = document.getElementById('hud-mode-btn');
+    const hudModeIcon = document.getElementById('hud-mode-icon');
+    const hudModeLabel = document.getElementById('hud-mode-label');
+    const playerNameInput = document.getElementById('player-name-input');
+    const nameSavedBadge = document.getElementById('name-saved-badge');
+
+    const FUN_NAMES = ['KongFlash', 'BananaBoss', 'TurboChimp', 'CyberSimian', 'NeonApe', 'JungleKing', 'RocketMonkey'];
+
+    function persistCustomName() {
+      const val = playerNameInput.value.trim() || 'MonkeyKing';
+      gameState.playerName = val;
+      updatePlayerNameSprite(val);
+      try {
+        localStorage.setItem('monkey_runner_player_name', val);
+      } catch (e) {}
+      nameSavedBadge.classList.remove('hidden');
+      setTimeout(() => nameSavedBadge.classList.add('hidden'), 1800);
+    }
+
+    document.getElementById('save-name-btn').addEventListener('click', persistCustomName);
+
+    document.getElementById('random-name-btn').addEventListener('click', () => {
+      const pick = FUN_NAMES[Math.floor(Math.random() * FUN_NAMES.length)] + Math.floor(Math.random() * 99);
+      playerNameInput.value = pick;
+      persistCustomName();
+    });
+
+    playerNameInput.addEventListener('input', () => {
+      const val = playerNameInput.value.trim() || 'MonkeyKing';
+      gameState.playerName = val;
+      updatePlayerNameSprite(val);
+    });
+
+    function setGameMode(isMulti) {
+      gameState.isMultiplayer = isMulti;
+      if (isMulti) {
+        modeMultiBtn.className = 'py-1.5 px-3 rounded-xl font-bold text-xs border border-emerald-400 bg-emerald-500/25 text-white flex items-center justify-center gap-1.5 shadow transition cursor-pointer';
+        modeSoloBtn.className = 'py-1.5 px-3 rounded-xl font-bold text-xs border border-white/15 bg-white/5 text-gray-300 hover:bg-white/10 flex items-center justify-center gap-1.5 transition cursor-pointer';
+        liveRaceBoard.classList.remove('hidden');
+        hudModeIcon.textContent = '🤖';
+        hudModeLabel.textContent = 'Multiplayer';
+        aiBots.forEach(b => b.group.visible = true);
+      } else {
+        modeSoloBtn.className = 'py-1.5 px-3 rounded-xl font-bold text-xs border border-emerald-400 bg-emerald-500/25 text-white flex items-center justify-center gap-1.5 shadow transition cursor-pointer';
+        modeMultiBtn.className = 'py-1.5 px-3 rounded-xl font-bold text-xs border border-white/15 bg-white/5 text-gray-300 hover:bg-white/10 flex items-center justify-center gap-1.5 transition cursor-pointer';
+        liveRaceBoard.classList.add('hidden');
+        hudModeIcon.textContent = '🏃';
+        hudModeLabel.textContent = 'Single Player';
+        aiBots.forEach(b => b.group.visible = false);
+      }
+      updateLiveRaceHUD();
+    }
+
+    modeMultiBtn.addEventListener('click', () => setGameMode(true));
+    modeSoloBtn.addEventListener('click', () => setGameMode(false));
+
+    // In-game HUD Mode Toggle button
+    hudModeBtn.addEventListener('click', () => {
+      setGameMode(!gameState.isMultiplayer);
+    });
+
+    function launchGameWithMode(isMulti) {
+      sound.init();
+      setGameMode(isMulti);
+      const val = playerNameInput.value.trim();
+      if (val) {
+        gameState.playerName = val;
+        updatePlayerNameSprite(val);
+      }
+      startOverlay.classList.add('opacity-0', 'pointer-events-none');
+      setTimeout(() => startOverlay.classList.add('hidden'), 300);
+      resetGame();
+      sound.startMusic();
+    }
+
+    document.getElementById('play-single-btn').addEventListener('click', () => launchGameWithMode(false));
+    document.getElementById('play-multi-btn').addEventListener('click', () => launchGameWithMode(true));
+    document.getElementById('gameover-single-btn').addEventListener('click', () => launchGameWithMode(false));
+    document.getElementById('gameover-multi-btn').addEventListener('click', () => launchGameWithMode(true));
+
+    document.getElementById('start-btn').addEventListener('click', () => {
+      launchGameWithMode(gameState.isMultiplayer);
+    });
+
+    document.getElementById('restart-btn').addEventListener('click', () => {
+      sound.init();
+      resetGame();
+      sound.startMusic();
+    });
+
+    // --- Leaderboard & Saved History Modal Logic ---
+    const tabTopRanksBtn = document.getElementById('tab-top-ranks-btn');
+    const tabHistoryBtn = document.getElementById('tab-history-btn');
+    const hallOfFameList = document.getElementById('hall-of-fame-list');
+    const matchHistoryList = document.getElementById('match-history-list');
+
+    function renderLeaderboardAndHistory() {
+      hallOfFameList.innerHTML = '';
+      globalLeaderboard.forEach((entry, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+        const row = document.createElement('div');
+        row.className = `flex items-center justify-between px-3.5 py-2 rounded-2xl border ${entry.isCurrentUser ? 'bg-emerald-500/20 border-emerald-400/50 text-white' : 'bg-white/5 border-white/10 text-gray-200'}`;
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="font-black text-sm w-6">${medal}</span>
+            <div>
+              <div class="font-bold text-xs">${entry.name}</div>
+              <div class="text-[10px] text-gray-400">${entry.skin || '🐵 Classic'} • ${entry.mode || 'Race'}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2.5 text-xs">
+            <span class="text-yellow-400 font-bold">🍌 ${entry.bananas || 0}</span>
+            <span class="text-emerald-400 font-black text-sm">${entry.distance}m</span>
+          </div>
+        `;
+        hallOfFameList.appendChild(row);
+      });
+
+      matchHistoryList.innerHTML = '';
+      if (matchHistoryLog.length === 0) {
+        matchHistoryList.innerHTML = `<div class="text-center text-gray-400 text-xs py-8">No match history saved yet. Play a run to record your history!</div>`;
+      } else {
+        matchHistoryLog.forEach((item) => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between px-3.5 py-2 rounded-2xl border bg-white/5 border-white/10 text-gray-200';
+          row.innerHTML = `
+            <div>
+              <div class="font-bold text-xs text-white">${item.name} <span class="text-emerald-300">(${item.rank || 'Run'})</span></div>
+              <div class="text-[10px] text-gray-400">${item.time || 'Recent'} • ${item.mode} • ${item.skin}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-emerald-400 font-black text-sm">${item.distance}m</div>
+              <div class="text-[10px] text-yellow-400 font-bold">🍌 ${item.bananas}</div>
+            </div>
+          `;
+          matchHistoryList.appendChild(row);
+        });
+      }
+    }
+
+    tabTopRanksBtn.addEventListener('click', () => {
+      tabTopRanksBtn.className = 'py-2 px-3 rounded-xl font-bold text-xs bg-yellow-500/25 border border-yellow-400 text-yellow-300 cursor-pointer';
+      tabHistoryBtn.className = 'py-2 px-3 rounded-xl font-bold text-xs bg-white/5 border border-white/15 text-gray-300 hover:bg-white/10 cursor-pointer';
+      hallOfFameList.classList.remove('hidden');
+      matchHistoryList.classList.add('hidden');
+    });
+
+    tabHistoryBtn.addEventListener('click', () => {
+      tabHistoryBtn.className = 'py-2 px-3 rounded-xl font-bold text-xs bg-yellow-500/25 border border-yellow-400 text-yellow-300 cursor-pointer';
+      tabTopRanksBtn.className = 'py-2 px-3 rounded-xl font-bold text-xs bg-white/5 border border-white/15 text-gray-300 hover:bg-white/10 cursor-pointer';
+      matchHistoryList.classList.remove('hidden');
+      hallOfFameList.classList.add('hidden');
+    });
+
+    document.getElementById('clear-history-btn').addEventListener('click', () => {
+      matchHistoryLog = [];
+      globalLeaderboard = [...DEFAULT_LEADERBOARD];
+      try {
+        localStorage.removeItem('monkey_runner_history_v2');
+        localStorage.removeItem('monkey_runner_leaderboard_v2');
+      } catch (e) {}
+      renderLeaderboardAndHistory();
+    });
+
+    function openLeaderboardModal() {
+      renderLeaderboardAndHistory();
+      leaderboardModal.classList.remove('hidden');
+    }
+
+    function closeLeaderboardModal() {
+      leaderboardModal.classList.add('hidden');
+    }
+
+    document.getElementById('open-leaderboard-start-btn').addEventListener('click', openLeaderboardModal);
+    document.getElementById('open-leaderboard-over-btn').addEventListener('click', openLeaderboardModal);
+    document.getElementById('hud-leaderboard-btn').addEventListener('click', openLeaderboardModal);
+    document.getElementById('close-leaderboard-btn').addEventListener('click', closeLeaderboardModal);
+    document.getElementById('close-leaderboard-bottom-btn').addEventListener('click', closeLeaderboardModal);
+
+    function getLiveRacersSorted() {
+      const list = [
+        { name: gameState.playerName || 'You', distance: Math.floor(gameState.distance), bananas: gameState.bananas, isPlayer: true }
+      ];
+      if (gameState.isMultiplayer) {
+        aiBots.forEach(b => {
+          list.push({
+            name: b.name,
+            distance: Math.floor(b.distance),
+            bananas: b.bananas,
+            isPlayer: false
+          });
+        });
+      }
+      list.sort((a, b) => b.distance - a.distance);
+      return list;
+    }
+
+    function updateLiveRaceHUD() {
+      if (!gameState.isMultiplayer) return;
+      const sorted = getLiveRacersSorted();
+      const suffixes = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+      liveStandingsList.innerHTML = '';
+
+      sorted.forEach((r, idx) => {
+        if (r.isPlayer) {
+          playerRankBadge.textContent = suffixes[idx] || '6th';
+        }
+        const row = document.createElement('div');
+        row.className = `flex items-center justify-between px-2 py-0.5 rounded ${r.isPlayer ? 'bg-emerald-500/30 text-emerald-200 font-bold' : 'text-gray-300'}`;
+        row.innerHTML = `
+          <span class="truncate max-w-[110px]">${idx + 1}. ${r.name}</span>
+          <span class="font-mono text-[10px]">${r.distance}m</span>
+        `;
+        liveStandingsList.appendChild(row);
+      });
+    }
+
+    pauseBtn.addEventListener('click', () => {
+      if (!gameState.running) return;
+      gameState.paused = !gameState.paused;
+      pauseBtn.textContent = gameState.paused ? 'Resume' : 'Pause';
+      if (gameState.paused) sound.stopAllContinuous();
+    });
+
+    muteBtn.addEventListener('click', () => {
+      sound.init();
+      sound.muted = !sound.muted;
+      muteBtn.textContent = sound.muted ? '🔇' : '🔊';
+      if (sound.muted) sound.stopAllContinuous();
+    });
+
+    function showBiomeNotification(biome) {
+      biomeBannerIcon.textContent = biome.icon;
+      biomeBannerText.textContent = biome.bannerText;
+      biomeBannerBox.className = `px-6 py-2.5 rounded-full border shadow-2xl flex items-center gap-3 backdrop-blur-md ${biome.borderStyle}`;
+      biomeBanner.classList.remove('hidden');
+      setTimeout(() => {
+        biomeBanner.classList.add('hidden');
+      }, 3500);
+    }
+
+    function activateFlyingCar() {
+      gameState.isFlying = true;
+      gameState.flyTimeRemaining = CONFIG.flyDuration;
+      flyingCarVehicle.visible = true;
+      flyTimerContainer.classList.remove('hidden');
+      sound.playPowerup();
+
+      for (let s = 1; s <= 4; s++) {
+        const lane = Math.floor(Math.random() * 3);
+        spawnBananaCluster(lane, -s * 28, CONFIG.flightAltitude + 0.3);
+      }
+    }
+
+    function deactivateFlyingCar() {
+      gameState.isFlying = false;
+      gameState.flyTimeRemaining = 0;
+      flyingCarVehicle.visible = false;
+      flyTimerContainer.classList.add('hidden');
+      sound.updateJetSound(false);
+    }
+
+    function activateHoverboard() {
+      gameState.hasHoverboard = true;
+      gameState.hoverboardTimeRemaining = CONFIG.hoverboardDuration;
+      hoverboardMesh.visible = true;
+      hoverboardContainer.classList.remove('hidden');
+      sound.playPowerup();
+    }
+
+    function deactivateHoverboard() {
+      gameState.hasHoverboard = false;
+      gameState.hoverboardTimeRemaining = 0;
+      hoverboardMesh.visible = false;
+      hoverboardContainer.classList.add('hidden');
+    }
+
+    function activateMagnet() {
+      gameState.hasMagnet = true;
+      gameState.magnetTimeRemaining = CONFIG.magnetDuration;
+      magnetContainer.classList.remove('hidden');
+      sound.playPowerup();
+    }
+
+    function deactivateMagnet() {
+      gameState.hasMagnet = false;
+      gameState.magnetTimeRemaining = 0;
+      magnetContainer.classList.add('hidden');
+    }
+
+    function resetGame() {
+      activeObstacles.forEach(o => scene.remove(o.group));
+      activeObstacles.length = 0;
+      activeBananas.forEach(b => scene.remove(b.mesh));
+      activeBananas.length = 0;
+      activeTrains.forEach(t => scene.remove(t.group));
+      activeTrains.length = 0;
+      activeBikes.forEach(bk => scene.remove(bk.group));
+      activeBikes.length = 0;
+      activePickups.forEach(p => scene.remove(p.group));
+      activePickups.length = 0;
+
+      for (let i = 0; i < chunks.length; i++) {
+        chunks[i].position.z = -i * CONFIG.chunkLength;
+        if (i >= 2) {
+          const blockedLane = Math.floor(Math.random() * 3);
+          const rand = Math.random();
+          if (rand < 0.22) {
+            const types = ['flying_car', 'hoverboard', 'magnet'];
+            spawnPowerupAt(types[Math.floor(Math.random() * types.length)], blockedLane, chunks[i].position.z);
+          } else if (rand < 0.45) {
+            spawnBikeAt(blockedLane, chunks[i].position.z);
+          } else if (rand < 0.72) {
+            spawnTrainAt(blockedLane, chunks[i].position.z, Math.random() < 0.5);
+          } else {
+            spawnObstacleAt(blockedLane, chunks[i].position.z);
+          }
+          const bananaLane = (blockedLane + 1) % 3;
+          spawnBananaCluster(bananaLane, chunks[i].position.z + 8, 1.2);
+        }
+      }
+
+      torsoMesh.scale.set(0.85, 1.15, 0.82);
+      torsoMesh.position.set(0, 1.05, 0);
+      headGroup.position.set(0, 1.72, 0);
+      leftArm.rotation.set(0, 0, 0);
+      rightArm.rotation.set(0, 0, 0);
+      leftLeg.rotation.set(0, 0, 0);
+      rightLeg.rotation.set(0, 0, 0);
+      monkeyGroup.position.set(0, 0, 0);
+      monkeyGroup.rotation.set(0, 0, 0);
+
+      aiBots.forEach((b, idx) => {
+        b.lane = BOT_CONFIGS[idx].startLane;
+        b.targetX = CONFIG.lanes[b.lane];
+        b.zRel = BOT_CONFIGS[idx].zOffset;
+        b.y = 0;
+        b.vy = 0;
+        b.isGrounded = true;
+        b.distance = 0;
+        b.bananas = 0;
+        b.group.position.set(b.targetX, 0, b.zRel);
+        b.group.visible = gameState.isMultiplayer;
+      });
+
+      humanGroup.position.set(0, 0, 4.2);
+      hTorso.position.y = 1.7;
+      hLeftArm.rotation.set(0, 0, 0);
+      hRightArm.rotation.set(0, 0, 0);
+
+      gameState.running = true;
+      gameState.paused = false;
+      gameState.isCaught = false;
+      gameState.catchProgress = 0;
+      gameState.cameraShake = 0;
+      gameState.elapsedTime = 0;
+      gameState.distance = 0;
+      gameState.bananas = 0;
+      gameState.currentLane = 1;
+      gameState.targetX = CONFIG.lanes[1];
+      gameState.monkeyY = 0;
+      gameState.monkeyVelocityY = 0;
+      gameState.isGrounded = true;
+      gameState.isSliding = false;
+      gameState.slideTimer = 0;
+      gameState.runSpeed = CONFIG.runSpeedInitial;
+      gameState.cameraX = 0;
+
+      deactivateFlyingCar();
+      deactivateHoverboard();
+      deactivateMagnet();
+
+      applyBiomeEnvironment(gameState.startingBiomeIndex, false);
+
+      bananaCountEl.textContent = '0';
+      distanceCountEl.textContent = '0m';
+      pauseBtn.textContent = 'Pause';
+      gameoverOverlay.classList.add('hidden');
+      updateLiveRaceHUD();
+    }
+
+    function triggerGameOver(reason) {
+      if (gameState.isCaught) return;
+
+      if (gameState.hasHoverboard) {
+        deactivateHoverboard();
+        sound.playShieldBreak();
+        gameState.cameraShake = 0.4;
+        return;
+      }
+
+      gameState.isCaught = true;
+      gameState.gameOverReason = reason;
+      deactivateFlyingCar();
+      deactivateHoverboard();
+      deactivateMagnet();
+      sound.stopAllContinuous();
+      sound.stopMusic();
+
+      if (reason === 'train' || reason === 'bike') {
+        sound.playBikeCrash();
+        gameState.cameraShake = 0.7;
+        document.getElementById('gameover-icon').textContent = reason === 'bike' ? '🏍️' : '🚆';
+        document.getElementById('gameover-title').textContent = reason === 'bike' ? 'BIKE SMASH!' : 'TRAIN CRASH!';
+        document.getElementById('gameover-desc').textContent = reason === 'bike' ? 'Hit by a speeding patrol motorbike!' : 'Smashed into a speeding subway train!';
+      } else {
+        sound.playCrash();
+        sound.playWhistle();
+        gameState.cameraShake = 0.35;
+        document.getElementById('gameover-icon').textContent = '👮‍♂️';
+        document.getElementById('gameover-title').textContent = 'CAUGHT!';
+        document.getElementById('gameover-desc').textContent = 'The subway inspector captured the monkey!';
+      }
+
+      const finalDistMeters = Math.floor(gameState.distance);
+      if (finalDistMeters > gameState.bestDistance) {
+        gameState.bestDistance = finalDistMeters;
+        try {
+          localStorage.setItem('monkey_runner_highscore', finalDistMeters.toString());
+        } catch (e) {}
+      }
+
+      const sorted = getLiveRacersSorted();
+      const suffixes = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+      let playerRankStr = gameState.isMultiplayer ? '1st' : 'Solo';
+      const standingsEl = document.getElementById('gameover-standings-list');
+      standingsEl.innerHTML = '';
+
+      sorted.forEach((r, idx) => {
+        if (r.isPlayer && gameState.isMultiplayer) playerRankStr = suffixes[idx] || '6th';
+        const row = document.createElement('div');
+        row.className = `flex items-center justify-between px-3 py-1.5 rounded-xl ${r.isPlayer ? 'bg-emerald-500/25 border border-emerald-400/50 text-white font-bold' : 'bg-white/5 text-gray-300'}`;
+        row.innerHTML = `
+          <span>${suffixes[idx] || '#'} — ${r.name}</span>
+          <span class="font-mono text-emerald-300">${r.distance}m (🍌${r.bananas})</span>
+        `;
+        standingsEl.appendChild(row);
+      });
+
+      saveRunResult(gameState.playerName, finalDistMeters, gameState.bananas, playerRankStr);
+
+      document.getElementById('final-distance').textContent = finalDistMeters + 'm';
+      document.getElementById('final-bananas').textContent = gameState.bananas.toString();
+      document.getElementById('final-rank').textContent = playerRankStr;
+      document.getElementById('best-distance').textContent = gameState.bestDistance + 'm';
+
+      setTimeout(() => {
+        gameoverOverlay.classList.remove('hidden');
+      }, 700);
+    }
+
+    // --- Main Game Loop ---
+    let lastTime = performance.now();
+    let animTime = 0;
+    let hudUpdateTimer = 0;
+
+    function animate(currentTime) {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min((currentTime - lastTime) / 1000, 0.08);
+      lastTime = currentTime;
+
+      if (gameState.isCaught) {
+        gameState.catchProgress = Math.min(gameState.catchProgress + delta * 2.2, 1.0);
+        humanGroup.position.z += (monkeyGroup.position.z + 0.95 - humanGroup.position.z) * 10 * delta;
+        humanGroup.position.x += (monkeyGroup.position.x - humanGroup.position.x) * 12 * delta;
+        hLeftArm.rotation.x = -1.4;
+        hRightArm.rotation.x = -1.4;
+        hTorso.position.y = 1.35;
+
+        monkeyGroup.rotation.x = -Math.PI / 4 * gameState.catchProgress;
+        monkeyGroup.position.y = 0.35;
+
+        if (gameState.cameraShake > 0) {
+          gameState.cameraShake = Math.max(0, gameState.cameraShake - delta * 1.8);
+          camera.position.x += (Math.random() - 0.5) * gameState.cameraShake;
+          camera.position.y += (Math.random() - 0.5) * gameState.cameraShake;
+        }
+
+        renderer.render(scene, camera);
+        return;
+      }
+
+      if (!gameState.running || gameState.paused) {
+        renderer.render(scene, camera);
+        return;
+      }
+
+      animTime += delta;
+      gameState.elapsedTime += delta;
+      hudUpdateTimer += delta;
+
+      // 1. Dynamic 50-Second Biome Switcher
+      const targetBiome = (gameState.startingBiomeIndex + Math.floor(gameState.elapsedTime / CONFIG.biomeIntervalSeconds)) % BIOMES.length;
+      if (targetBiome !== gameState.currentBiomeIndex) {
+        applyBiomeEnvironment(targetBiome, true);
+      }
+
+      // 2. Player Distance Progression
+      const speedMultiplier = gameState.isFlying ? 1.25 : 1.0;
+      const stepDist = gameState.runSpeed * speedMultiplier * delta * 0.45;
+      gameState.distance += stepDist;
+      distanceCountEl.textContent = Math.floor(gameState.distance) + 'm';
+      if (gameState.runSpeed < CONFIG.runSpeedMax) {
+        gameState.runSpeed += CONFIG.speedRampRate * delta;
+      }
+
+      // 3. AI Bots Update & Smart Obstacle Avoidance (Multiplayer Mode)
+      if (gameState.isMultiplayer) {
+        aiBots.forEach((bot, bIdx) => {
+          const wave = Math.sin(animTime * 0.8 + bIdx * 2.1) * 0.08;
+          const botStep = gameState.runSpeed * (bot.basePace + wave) * delta * 0.45;
+          bot.distance += botStep;
+
+          const distDiff = bot.distance - gameState.distance;
+          const targetZRel = Math.max(-28, Math.min(6, -distDiff * 1.4));
+          bot.zRel += (targetZRel - bot.zRel) * 3 * delta;
+          bot.group.position.z = bot.zRel;
+
+          bot.decisionCooldown -= delta;
+          if (bot.decisionCooldown <= 0) {
+            let dangerAhead = false;
+            let canJumpIt = false;
+
+            for (const obs of activeObstacles) {
+              const dz = obs.z - bot.zRel;
+              if (obs.lane === bot.lane && dz < 1.5 && dz > -14) {
+                dangerAhead = true;
+                canJumpIt = (obs.hitbox.type === 'hurdle');
+                break;
+              }
+            }
+            if (!dangerAhead) {
+              for (const tr of activeTrains) {
+                const dz = (tr.z + tr.length / 2) - bot.zRel;
+                if (tr.lane === bot.lane && dz < 3 && dz > -22) {
+                  dangerAhead = true;
+                  canJumpIt = false;
+                  break;
+                }
+              }
+            }
+            if (!dangerAhead) {
+              for (const bk of activeBikes) {
+                const dz = bk.z - bot.zRel;
+                if (bk.lane === bot.lane && dz < 2 && dz > -18) {
+                  dangerAhead = true;
+                  canJumpIt = false;
+                  break;
+                }
+              }
+            }
+
+            if (dangerAhead) {
+              if (canJumpIt && bot.isGrounded && Math.random() < 0.65) {
+                bot.vy = CONFIG.jumpVelocity;
+                bot.isGrounded = false;
+              } else {
+                const altLanes = [0, 1, 2].filter(l => l !== bot.lane);
+                bot.lane = altLanes[Math.floor(Math.random() * altLanes.length)];
+                bot.targetX = CONFIG.lanes[bot.lane];
+              }
+              bot.decisionCooldown = 0.35;
+            }
+          }
+
+          bot.group.position.x += (bot.targetX - bot.group.position.x) * 11 * delta;
+
+          if (!bot.isGrounded) {
+            bot.vy += CONFIG.gravity * delta;
+            bot.y += bot.vy * delta;
+            if (bot.y <= 0) {
+              bot.y = 0;
+              bot.vy = 0;
+              bot.isGrounded = true;
+            }
+          }
+
+          const botCycle = animTime * gameState.runSpeed * 0.78 + bIdx;
+          bot.leftArm.rotation.x = Math.sin(botCycle) * 0.85;
+          bot.rightArm.rotation.x = -Math.sin(botCycle) * 0.85;
+          bot.leftLeg.rotation.x = -Math.sin(botCycle) * 0.95;
+          bot.rightLeg.rotation.x = Math.sin(botCycle) * 0.95;
+          bot.group.position.y = bot.y + (bot.isGrounded ? Math.abs(Math.sin(botCycle * 2)) * 0.1 : 0);
+
+          if (Math.random() < delta * 0.85) {
+            bot.bananas++;
+          }
+        });
+
+        if (hudUpdateTimer > 0.25) {
+          hudUpdateTimer = 0;
+          updateLiveRaceHUD();
+        }
+      }
+
+      // 4. Power-Up Timers
+      if (gameState.isFlying) {
+        gameState.flyTimeRemaining -= delta;
+        flyTimerText.textContent = Math.max(0, gameState.flyTimeRemaining).toFixed(1) + 's';
+        sound.updateJetSound(true);
+
+        const targetAlt = CONFIG.flightAltitude + Math.sin(animTime * 3) * 0.25;
+        gameState.monkeyY += (targetAlt - gameState.monkeyY) * 4 * delta;
+        gameState.isGrounded = false;
+
+        const flameScale = 1.0 + Math.sin(animTime * 25) * 0.3;
+        flameLeft.scale.set(flameScale, flameScale, 1.0 + Math.random() * 0.4);
+        flameRight.scale.set(flameScale, flameScale, 1.0 + Math.random() * 0.4);
+
+        if (gameState.flyTimeRemaining <= 0) deactivateFlyingCar();
+      } else {
+        if (!gameState.isGrounded) {
+          gameState.monkeyVelocityY += CONFIG.gravity * delta;
+          gameState.monkeyY += gameState.monkeyVelocityY * delta;
+
+          if (gameState.monkeyY <= 0) {
+            gameState.monkeyY = 0;
+            gameState.monkeyVelocityY = 0;
+            gameState.isGrounded = true;
+          }
+        }
+      }
+
+      if (gameState.hasHoverboard) {
+        gameState.hoverboardTimeRemaining -= delta;
+        hoverboardTimerText.textContent = Math.max(0, gameState.hoverboardTimeRemaining).toFixed(1) + 's';
+        if (gameState.hoverboardTimeRemaining <= 0) deactivateHoverboard();
+      }
+
+      if (gameState.hasMagnet) {
+        gameState.magnetTimeRemaining -= delta;
+        magnetTimerText.textContent = Math.max(0, gameState.magnetTimeRemaining).toFixed(1) + 's';
+        if (gameState.magnetTimeRemaining <= 0) deactivateMagnet();
+      }
+
+      // 5. Player Lateral Movement & Poses
+      monkeyGroup.position.x += (gameState.targetX - monkeyGroup.position.x) * 14 * delta;
+      if (gameState.isSliding) {
+        gameState.slideTimer -= delta;
+        if (gameState.slideTimer <= 0) gameState.isSliding = false;
+      }
+
+      monkeyGroup.position.y = gameState.monkeyY;
+
+      if (gameState.isFlying) {
+        torsoMesh.scale.set(0.85, 1.05, 0.82);
+        torsoMesh.position.y = 0.9;
+        headGroup.position.set(0, 1.55, 0);
+        leftArm.rotation.x = -1.2;
+        rightArm.rotation.x = -1.2;
+        leftLeg.rotation.x = 0.8;
+        rightLeg.rotation.x = 0.8;
+        monkeyGroup.rotation.z = (gameState.targetX - monkeyGroup.position.x) * -0.22;
+      } else if (gameState.isSliding) {
+        torsoMesh.scale.set(1.12, 0.48, 1.25);
+        torsoMesh.position.y = 0.42;
+        headGroup.position.set(0, 0.65, -0.22);
+        leftArm.rotation.x = -1.25;
+        rightArm.rotation.x = -1.25;
+        leftLeg.rotation.x = 1.35;
+        rightLeg.rotation.x = 1.35;
+      } else {
+        torsoMesh.scale.set(0.85, 1.15, 0.82);
+        torsoMesh.position.y = 1.05;
+        headGroup.position.set(0, 1.72, 0);
+
+        if (gameState.isGrounded) {
+          const runCycle = animTime * gameState.runSpeed * 0.78;
+          leftArm.rotation.x = Math.sin(runCycle) * 0.9;
+          rightArm.rotation.x = -Math.sin(runCycle) * 0.9;
+          leftLeg.rotation.x = -Math.sin(runCycle) * 1.0;
+          rightLeg.rotation.x = Math.sin(runCycle) * 1.0;
+          monkeyGroup.position.y = gameState.monkeyY + Math.abs(Math.sin(runCycle * 2)) * 0.12;
+        } else {
+          leftArm.rotation.x = -2.1;
+          rightArm.rotation.x = -2.1;
+          leftLeg.rotation.x = 0.65;
+          rightLeg.rotation.x = 0.65;
+        }
+
+        const laneDelta = gameState.targetX - monkeyGroup.position.x;
+        monkeyGroup.rotation.z = -laneDelta * 0.16;
+      }
+
+      for (let i = 0; i < tailSegments.length; i++) {
+        tailSegments[i].rotation.x = 0.28 + Math.sin(animTime * 7 + i * 0.45) * 0.16;
+        tailSegments[i].rotation.z = Math.cos(animTime * 5 + i * 0.35) * 0.14;
+      }
+
+      // Human Catcher
+      const humanRunCycle = animTime * gameState.runSpeed * 0.75;
+      humanGroup.position.x += (monkeyGroup.position.x - humanGroup.position.x) * 8 * delta;
+      if (gameState.isFlying) {
+        humanGroup.position.z += (monkeyGroup.position.z + 8.5 - humanGroup.position.z) * 3 * delta;
+      } else {
+        humanGroup.position.z = monkeyGroup.position.z + 4.1 + Math.sin(animTime * 3) * 0.3;
+        hLeftArm.rotation.x = -0.9 + Math.sin(humanRunCycle) * 0.7;
+        hRightArm.rotation.x = -0.9 - Math.sin(humanRunCycle) * 0.7;
+        hLeftLeg.rotation.x = -Math.sin(humanRunCycle) * 0.85;
+        hRightLeg.rotation.x = Math.sin(humanRunCycle) * 0.85;
+      }
+
+      // Camera Follow
+      gameState.cameraX += (monkeyGroup.position.x * 0.45 - gameState.cameraX) * 7 * delta;
+      camera.position.x = gameState.cameraX;
+      const camTargetY = gameState.isFlying ? 7.8 : 4.6 + (gameState.monkeyY * 0.25);
+      camera.position.y += (camTargetY - camera.position.y) * 5 * delta;
+      camera.lookAt(gameState.cameraX * 0.6, (gameState.isFlying ? 4.5 : 1.8 + (gameState.monkeyY * 0.15)), -12);
+
+      // 6. Move Chunks & Horizon Recycling
+      const worldShift = gameState.runSpeed * delta;
+      for (let i = 0; i < chunks.length; i++) {
+        chunks[i].position.z += worldShift;
+
+        if (chunks[i].position.z > 26) {
+          let minZ = 0;
+          for (let j = 0; j < chunks.length; j++) {
+            if (chunks[j].position.z < minZ) minZ = chunks[j].position.z;
+          }
+          chunks[i].position.z = minZ - CONFIG.chunkLength;
+
+          const blockedLane = Math.floor(Math.random() * 3);
+          const rand = Math.random();
+
+          if (rand < 0.22 && activePickups.length === 0 && !gameState.isFlying) {
+            const types = ['flying_car', 'hoverboard', 'magnet'];
+            spawnPowerupAt(types[Math.floor(Math.random() * types.length)], blockedLane, chunks[i].position.z);
+          } else if (rand < 0.45) {
+            spawnBikeAt(blockedLane, chunks[i].position.z);
+          } else if (rand < 0.72) {
+            spawnTrainAt(blockedLane, chunks[i].position.z, Math.random() < 0.5);
+          } else {
+            spawnObstacleAt(blockedLane, chunks[i].position.z);
+          }
+
+          const bananaLane = (blockedLane + 1) % 3;
+          const bananaAlt = gameState.isFlying ? (CONFIG.flightAltitude + 0.3) : 1.2;
+          spawnBananaCluster(bananaLane, chunks[i].position.z + 8, bananaAlt);
+        }
+      }
+
+      // 7. Update Pickups
+      const monkeyZ = monkeyGroup.position.z;
+      const monkeyX = monkeyGroup.position.x;
+      const monkeyBottom = gameState.monkeyY;
+      const monkeyTop = gameState.isSliding ? gameState.monkeyY + 0.82 : gameState.monkeyY + 1.95;
+
+      for (let i = activePickups.length - 1; i >= 0; i--) {
+        const p = activePickups[i];
+        p.group.position.z += worldShift;
+        p.z += worldShift;
+        p.group.rotation.y += 3.2 * delta;
+
+        if (!p.collected && Math.abs(p.z - monkeyZ) < 1.35) {
+          const distToX = Math.abs(p.group.position.x - monkeyX);
+          if (distToX < 1.25 && monkeyBottom < 2.0) {
+            p.collected = true;
+            scene.remove(p.group);
+            activePickups.splice(i, 1);
+            if (p.type === 'flying_car') activateFlyingCar();
+            else if (p.type === 'hoverboard') activateHoverboard();
+            else if (p.type === 'magnet') activateMagnet();
+            continue;
+          }
+        }
+        if (p.z > 26) {
+          scene.remove(p.group);
+          activePickups.splice(i, 1);
+        }
+      }
+
+      // 8. Update Speeding Motorbikes + Engine Audio
+      let nearestBikeDist = 999;
+      for (let i = activeBikes.length - 1; i >= 0; i--) {
+        const bk = activeBikes[i];
+        bk.prevZ = bk.z;
+        const bikeShift = worldShift + bk.speed * delta;
+        bk.group.position.z += bikeShift;
+        bk.z += bikeShift;
+
+        bk.frontWheel.rotation.x += bikeShift * 5;
+        bk.rearWheel.rotation.x += bikeShift * 5;
+
+        const absDist = Math.abs(bk.z - monkeyZ);
+        if (absDist < nearestBikeDist) nearestBikeDist = absDist;
+
+        if (!gameState.isFlying) {
+          const sweptMinZ = Math.min(bk.prevZ, bk.z) - 0.7;
+          const sweptMaxZ = Math.max(bk.prevZ, bk.z) + 0.7;
+          if (monkeyZ >= sweptMinZ && monkeyZ <= sweptMaxZ) {
+            if (Math.abs(bk.group.position.x - monkeyX) < 1.1) {
+              triggerGameOver('bike');
+              return;
+            }
+          }
+        }
+
+        if (bk.z > 26) {
+          scene.remove(bk.group);
+          activeBikes.splice(i, 1);
+        }
+      }
+      sound.updateBikeEngine(nearestBikeDist);
+
+      // 9. Update Subway Trains
+      for (let i = activeTrains.length - 1; i >= 0; i--) {
+        const tr = activeTrains[i];
+        tr.prevZ = tr.z;
+        const trainShift = worldShift + (tr.isMoving ? tr.speed * delta : 0);
+        tr.group.position.z += trainShift;
+        tr.z += trainShift;
+
+        if (!gameState.isFlying) {
+          const halfLen = tr.length / 2;
+          const trainMinZ = tr.z - halfLen;
+          const trainMaxZ = tr.z + halfLen;
+
+          if (monkeyZ >= trainMinZ && monkeyZ <= trainMaxZ) {
+            const distLane = Math.abs(tr.group.position.x - monkeyX);
+            if (distLane < 1.1) {
+              if (monkeyBottom >= 3.3) {
+                gameState.monkeyY = 3.5;
+                gameState.monkeyVelocityY = 0;
+                gameState.isGrounded = true;
+              } else {
+                triggerGameOver('train');
+                return;
+              }
+            }
+          }
+        }
+
+        if (tr.z - tr.length / 2 > 26) {
+          scene.remove(tr.group);
+          activeTrains.splice(i, 1);
+        }
+      }
+
+      // 10. Update Obstacles (Hurdles & Low Arches)
+      for (let i = activeObstacles.length - 1; i >= 0; i--) {
+        const obs = activeObstacles[i];
+        obs.prevZ = obs.z;
+        obs.group.position.z += worldShift;
+        obs.z += worldShift;
+
+        if (!gameState.isFlying) {
+          const sweptMinZ = Math.min(obs.prevZ, obs.z) - 0.4;
+          const sweptMaxZ = Math.max(obs.prevZ, obs.z) + 0.4;
+
+          if (monkeyZ >= sweptMinZ && monkeyZ <= sweptMaxZ) {
+            const laneDistance = Math.abs(obs.group.position.x - monkeyX);
+            if (laneDistance < 0.95) {
+              const hit = (obs.hitbox.type === 'hurdle' && monkeyBottom < obs.hitbox.maxY) ||
+                          (obs.hitbox.type === 'low_tunnel' && monkeyTop > obs.hitbox.minY);
+              if (hit) {
+                triggerGameOver('obstacle');
+                return;
+              }
+            }
+          }
+        }
+
+        if (obs.z > 26) {
+          scene.remove(obs.group);
+          activeObstacles.splice(i, 1);
+        }
+      }
+
+      // 11. Bananas & Magnet Attraction
+      for (let i = activeBananas.length - 1; i >= 0; i--) {
+        const b = activeBananas[i];
+        b.mesh.position.z += worldShift;
+        b.z += worldShift;
+        b.mesh.rotation.y += 3.6 * delta;
+
+        if (gameState.hasMagnet && !b.collected && Math.abs(b.z - monkeyZ) < 18) {
+          b.mesh.position.x += (monkeyX - b.mesh.position.x) * 9 * delta;
+          b.mesh.position.y += ((gameState.monkeyY + 1.0) - b.mesh.position.y) * 9 * delta;
+        }
+
+        if (!b.collected && Math.abs(b.z - monkeyZ) < 1.35) {
+          const distToMonkey = Math.abs(b.mesh.position.x - monkeyX);
+          const vertDist = Math.abs(b.mesh.position.y - (gameState.monkeyY + 1.0));
+          if (distToMonkey < 1.25 && vertDist < 2.0) {
+            b.collected = true;
+            gameState.bananas++;
+            bananaCountEl.textContent = gameState.bananas.toString();
+            bananaCountEl.classList.remove('score-pop');
+            void bananaCountEl.offsetWidth;
+            bananaCountEl.classList.add('score-pop');
+            sound.playCollect();
+            scene.remove(b.mesh);
+            activeBananas.splice(i, 1);
+            continue;
+          }
+        }
+
+        if (b.z > 26) {
+          scene.remove(b.mesh);
+          activeBananas.splice(i, 1);
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', onWindowResize);
+
+    window.onload = () => {
+      onWindowResize();
+      updateLiveRaceHUD();
+      lastTime = performance.now();
+      requestAnimationFrame(animate);
+    };
+  </script>
+</body>
+</html>
